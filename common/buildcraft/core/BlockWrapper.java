@@ -11,6 +11,8 @@ package buildcraft.core;
 import net.minecraft.block.Block;
 import net.minecraft.tileentity.TileEntity;
 
+import buildcraft.api.core.BlockIndex;
+
 public class BlockWrapper {
 	public BlockIndex index;
 	public TileEntity tile;

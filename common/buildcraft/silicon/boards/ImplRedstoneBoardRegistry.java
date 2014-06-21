@@ -8,6 +8,8 @@
  */
 package buildcraft.silicon.boards;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Random;
 
@@ -22,7 +24,7 @@ import buildcraft.api.boards.RedstoneBoardRegistry;
 public class ImplRedstoneBoardRegistry extends RedstoneBoardRegistry {
 
 	private static class BoardFactory {
-		public RedstoneBoardNBT boardNBT;
+		public RedstoneBoardNBT<?> boardNBT;
 		public float probability;
 	}
 
@@ -33,7 +35,7 @@ public class ImplRedstoneBoardRegistry extends RedstoneBoardRegistry {
 	private Random rand = new Random();
 
 	@Override
-	public void registerBoardClass(RedstoneBoardNBT redstoneBoardNBT, float probability) {
+	public void registerBoardClass(RedstoneBoardNBT<?> redstoneBoardNBT, float probability) {
 		BoardFactory factory = new BoardFactory();
 		factory.boardNBT = redstoneBoardNBT;
 		factory.probability = probability;
@@ -53,19 +55,19 @@ public class ImplRedstoneBoardRegistry extends RedstoneBoardRegistry {
 
 			if (accumulatedSearch > value) {
 				nbt.setString("id", f.boardNBT.getID());
-				f.boardNBT.createRandomBoard(nbt, rand);
+				f.boardNBT.createRandomBoard(nbt);
 				return;
 			}
 		}
 	}
 
 	@Override
-	public RedstoneBoardNBT getRedstoneBoard(NBTTagCompound nbt) {
+	public RedstoneBoardNBT<?> getRedstoneBoard(NBTTagCompound nbt) {
 		return getRedstoneBoard(nbt.getString("id"));
 	}
 
 	@Override
-	public RedstoneBoardNBT getRedstoneBoard(String id) {
+	public RedstoneBoardNBT<?> getRedstoneBoard(String id) {
 		BoardFactory factory = boards.get(id);
 
 		if (factory != null) {
@@ -105,4 +107,14 @@ public class ImplRedstoneBoardRegistry extends RedstoneBoardRegistry {
 		}
 	}
 
+	@Override
+	public Collection<RedstoneBoardNBT<?>> getAllBoardNBTs() {
+		ArrayList<RedstoneBoardNBT<?>> result = new ArrayList<RedstoneBoardNBT<?>>();
+
+		for (BoardFactory f : boards.values()) {
+			result.add(f.boardNBT);
+		}
+
+		return result;
+	}
 }

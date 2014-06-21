@@ -20,6 +20,7 @@ import net.minecraftforge.fluids.FluidStack;
 import buildcraft.api.recipes.CraftingResult;
 import buildcraft.core.DefaultProps;
 import buildcraft.core.gui.AdvancedSlot;
+import buildcraft.core.gui.FluidSlot;
 import buildcraft.core.gui.GuiAdvancedInterface;
 import buildcraft.core.utils.StringUtils;
 import buildcraft.factory.TileRefinery;
@@ -39,9 +40,9 @@ public class GuiRefinery extends GuiAdvancedInterface {
 
 		this.slots = new AdvancedSlot[3];
 
-		this.slots[0] = new FluidSlot(38, 54);
-		this.slots[1] = new FluidSlot(126, 54);
-		this.slots[2] = new FluidSlot(82, 54);
+		this.slots[0] = new FluidSlot(this, 38, 54);
+		this.slots[1] = new FluidSlot(this, 126, 54);
+		this.slots[2] = new FluidSlot(this, 82, 54);
 	}
 
 	@Override
@@ -52,7 +53,7 @@ public class GuiRefinery extends GuiAdvancedInterface {
 		fontRendererObj.drawString("<-", 106, 59, 0x404040);
 		fontRendererObj.drawString(StringUtils.localize("gui.inventory"), 8, (ySize - 96) + 2, 0x404040);
 
-		drawForegroundSelection(par1, par2);
+		drawTooltipForSlotAt(par1, par2);
 	}
 
 	@Override
@@ -104,7 +105,6 @@ public class GuiRefinery extends GuiAdvancedInterface {
 	}
 
 	private void updateSlots() {
-
 		Fluid filter0 = container.getFilter(0);
 		Fluid filter1 = container.getFilter(1);
 
@@ -112,16 +112,6 @@ public class GuiRefinery extends GuiAdvancedInterface {
 		((FluidSlot) slots[0]).colorRenderCache = container.refinery.tanks[0].colorRenderCache;
 		((FluidSlot) slots[1]).fluid = filter1;
 		((FluidSlot) slots[1]).colorRenderCache = container.refinery.tanks[1].colorRenderCache;
-
-		FluidStack liquid0 = null;
-		FluidStack liquid1 = null;
-
-		if (filter0 != null) {
-			liquid0 = new FluidStack(filter0, FluidContainerRegistry.BUCKET_VOLUME);
-		}
-		if (filter1 != null) {
-			liquid1 = new FluidStack(filter1, FluidContainerRegistry.BUCKET_VOLUME);
-		}
 
 		CraftingResult<FluidStack> crafting = container.refinery.craftingResult;
 

@@ -15,49 +15,10 @@ import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.IIcon;
 import net.minecraft.util.ResourceLocation;
 
-import net.minecraftforge.fluids.Fluid;
-
-import buildcraft.core.render.FluidRenderer;
-import buildcraft.core.render.RenderUtils;
-
 public abstract class GuiAdvancedInterface extends GuiBuildCraft {
-	public class ItemSlot extends AdvancedSlot {
 
-		public ItemStack stack;
-
-		public ItemSlot(int x, int y) {
-			super(GuiAdvancedInterface.this, x, y);
-		}
-
-		@Override
-		public ItemStack getItemStack() {
-			return stack;
-		}
-	}
-
-	/**
-	 * More dynamic slot displaying an inventory fluid at specified position in
-	 * the passed IInventory
-	 */
-	public class IInventorySlot extends AdvancedSlot {
-
-		private IInventory tile;
-		private int slot;
-
-		public IInventorySlot(int x, int y, IInventory tile, int slot) {
-			super(GuiAdvancedInterface.this, x, y);
-			this.tile = tile;
-			this.slot = slot;
-		}
-
-		@Override
-		public ItemStack getItemStack() {
-			return tile.getStackInSlot(slot);
-		}
-	}
 	public AdvancedSlot[] slots;
 
 	public GuiAdvancedInterface(BuildCraftContainer container, IInventory inventory, ResourceLocation texture) {
@@ -96,9 +57,7 @@ public abstract class GuiAdvancedInterface extends GuiBuildCraft {
 		GL11.glPopMatrix();
 	}
 
-	protected void drawForegroundSelection(int mouseX, int mouseY) {
-		String s = "";
-
+	public void drawTooltipForSlotAt(int mouseX, int mouseY) {
 		int cornerX = (width - xSize) / 2;
 		int cornerY = (height - ySize) / 2;
 
@@ -108,47 +67,20 @@ public abstract class GuiAdvancedInterface extends GuiBuildCraft {
 			AdvancedSlot slot = slots[position];
 
 			if (slot != null) {
-				s = slot.getDescription();
+				slot.drawTooltip(this, mouseX, mouseY);
 			}
-		}
-
-		if (s.length() > 0) {
-			int i2 = mouseX - cornerX;
-			int k2 = mouseY - cornerY;
-			drawCreativeTabHoveringText(s, i2, k2);
-			RenderHelper.enableGUIStandardItemLighting();
 		}
 	}
 
-	/**
-	 * For the refinery, a kind of phantom slot for fluid.
-	 */
-	//TODO Get this class working well (Now it's just here to let the refinery compil)
-	public class FluidSlot extends AdvancedSlot {
+	public void drawTooltip(String caption, int mouseX, int mouseY) {
+		int cornerX = (width - xSize) / 2;
+		int cornerY = (height - ySize) / 2;
 
-		public Fluid fluid;
-		public int colorRenderCache;
-
-		public FluidSlot(int x, int y) {
-			super(GuiAdvancedInterface.this, x, y);
-		}
-
-		@Override
-		public void drawSprite(int cornerX, int cornerY) {
-			if (fluid != null) {
-				RenderUtils.setGLColorFromInt(colorRenderCache);
-			}
-			super.drawSprite(cornerX, cornerY);
-		}
-
-		@Override
-		public IIcon getIcon() {
-			return FluidRenderer.getFluidTexture(fluid, false);
-		}
-
-		@Override
-		public ResourceLocation getTexture() {
-			return FluidRenderer.getFluidSheet(fluid);
+		if (caption.length() > 0) {
+			int i2 = mouseX - cornerX;
+			int k2 = mouseY - cornerY;
+			drawCreativeTabHoveringText(caption, i2, k2);
+			RenderHelper.enableGUIStandardItemLighting();
 		}
 	}
 
@@ -162,5 +94,10 @@ public abstract class GuiAdvancedInterface extends GuiBuildCraft {
 
     public int getYSize () {
     	return ySize;
+    }
+
+    @Override
+	public void renderToolTip(ItemStack stack, int x, int y) {
+    	super.renderToolTip(stack, x, y);
     }
 }

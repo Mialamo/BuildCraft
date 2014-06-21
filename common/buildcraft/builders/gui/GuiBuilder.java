@@ -14,7 +14,6 @@ import org.lwjgl.opengl.GL11;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
-
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
@@ -24,6 +23,7 @@ import buildcraft.core.DefaultProps;
 import buildcraft.core.fluids.Tank;
 import buildcraft.core.gui.AdvancedSlot;
 import buildcraft.core.gui.GuiAdvancedInterface;
+import buildcraft.core.gui.ItemSlot;
 import buildcraft.core.network.RPCHandler;
 import buildcraft.core.utils.StringUtils;
 
@@ -45,7 +45,7 @@ public class GuiBuilder extends GuiAdvancedInterface {
 
 		for (int i = 0; i < 6; ++i) {
 			for (int j = 0; j < 4; ++j) {
-				slots[i * 4 + j] = new ItemSlot(179 + j * 18, 18 + i * 18);
+				slots[i * 4 + j] = new ItemSlot(this, 179 + j * 18, 18 + i * 18);
 			}
 		}
 	}
@@ -60,7 +60,7 @@ public class GuiBuilder extends GuiAdvancedInterface {
 		fontRendererObj.drawString(StringUtils.localize("gui.needed"), 178, 7, 0x404040);
 		fontRendererObj.drawString(StringUtils.localize("gui.building.fluids"), 178, 133, 0x404040);
 
-		drawForegroundSelection(par1, par2);
+		drawTooltipForSlotAt(par1, par2);
 	}
 
 	@Override

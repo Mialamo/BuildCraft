@@ -26,6 +26,9 @@ import net.minecraftforge.oredict.OreDictionary;
 
 import buildcraft.api.blueprints.SchematicRegistry;
 import buildcraft.api.boards.RedstoneBoardRegistry;
+import buildcraft.api.gates.ActionParameterItemStack;
+import buildcraft.api.gates.StatementManager;
+import buildcraft.api.gates.TriggerParameterItemStack;
 import buildcraft.api.recipes.BuildcraftRecipeRegistry;
 import buildcraft.api.transport.PipeWire;
 import buildcraft.builders.schematics.SchematicRotateMeta;
@@ -37,7 +40,11 @@ import buildcraft.core.Version;
 import buildcraft.core.network.BuildCraftChannelHandler;
 import buildcraft.core.proxy.CoreProxy;
 import buildcraft.core.robots.RobotIntegrationRecipe;
+import buildcraft.core.robots.boards.BoardRobotLeaveCutterNBT;
+import buildcraft.core.robots.boards.BoardRobotLumberjackNBT;
 import buildcraft.core.robots.boards.BoardRobotPickerNBT;
+import buildcraft.core.robots.boards.BoardRobotPlanterNBT;
+import buildcraft.core.triggers.BCAction;
 import buildcraft.silicon.BlockLaser;
 import buildcraft.silicon.BlockLaserTable;
 import buildcraft.silicon.GuiHandler;
@@ -56,12 +63,16 @@ import buildcraft.silicon.network.PacketHandlerSilicon;
 import buildcraft.silicon.recipes.AdvancedFacadeRecipe;
 import buildcraft.silicon.recipes.GateExpansionRecipe;
 import buildcraft.silicon.recipes.GateLogicSwapRecipe;
+import buildcraft.silicon.statements.ActionRobotGoToStation;
+import buildcraft.silicon.statements.RobotsActionProvider;
 import buildcraft.transport.gates.GateDefinition.GateLogic;
 import buildcraft.transport.gates.GateDefinition.GateMaterial;
 import buildcraft.transport.gates.GateExpansionPulsar;
 import buildcraft.transport.gates.GateExpansionRedstoneFader;
 import buildcraft.transport.gates.GateExpansionTimer;
 import buildcraft.transport.gates.ItemGate;
+import buildcraft.transport.triggers.ActionParameterSignal;
+import buildcraft.transport.triggers.TriggerParameterSignal;
 
 @Mod(name = "BuildCraft Silicon", version = Version.VERSION, useMetadata = false, modid = "BuildCraft|Silicon", dependencies = DefaultProps.DEPENDENCY_TRANSPORT)
 public class BuildCraftSilicon extends BuildCraftMod {
@@ -75,6 +86,8 @@ public class BuildCraftSilicon extends BuildCraftMod {
 
 	public static Item redstoneCrystal;
 	public static Item robotItem;
+
+	public static BCAction actionRobotGotoStation = new ActionRobotGoToStation();
 
 	@Mod.EventHandler
 	public void preInit(FMLPreInitializationEvent evt) {
@@ -108,6 +121,11 @@ public class BuildCraftSilicon extends BuildCraftMod {
 		RedstoneBoardRegistry.instance = new ImplRedstoneBoardRegistry();
 
 		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotPickerNBT.instance, 10);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotLumberjackNBT.instance, 10);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotPlanterNBT.instance, 5);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotLeaveCutterNBT.instance, 5);
+
+		StatementManager.registerActionProvider(new RobotsActionProvider());
 	}
 
 	@Mod.EventHandler
@@ -128,6 +146,11 @@ public class BuildCraftSilicon extends BuildCraftMod {
 		}
 
 		SiliconProxy.proxy.registerRenderers();
+
+		StatementManager.registerParameterClass("buildcraft:stackTrigger", TriggerParameterItemStack.class);
+		StatementManager.registerParameterClass("buildcraft:pipeWireTrigger", TriggerParameterSignal.class);
+		StatementManager.registerParameterClass("buildcraft:stackAction", ActionParameterItemStack.class);
+		StatementManager.registerParameterClass("buildcraft:pipeWireAction", ActionParameterSignal.class);
 	}
 
 	public static void loadRecipes() {
@@ -193,6 +216,8 @@ public class BuildCraftSilicon extends BuildCraftMod {
 				Items.redstone, Items.quartz);
 		BuildcraftRecipeRegistry.assemblyTable.addRecipe("buildcraft:compChipset", 60000, Chipset.COMP.getStack(),
 				Items.redstone, Items.comparator);
+		BuildcraftRecipeRegistry.assemblyTable.addRecipe("buildcraft:emeraldChipset", 120000,
+				Chipset.EMERALD.getStack(), Items.redstone, Items.emerald);
 
 		// GATES
 		BuildcraftRecipeRegistry.assemblyTable.addRecipe("buildcraft:simpleGate", 10000,
@@ -202,6 +227,8 @@ public class BuildCraftSilicon extends BuildCraftMod {
 		addGateRecipe("Iron", 20000, GateMaterial.IRON, Chipset.IRON, PipeWire.RED, PipeWire.BLUE);
 		addGateRecipe("Gold", 40000, GateMaterial.GOLD, Chipset.GOLD, PipeWire.RED, PipeWire.BLUE, PipeWire.GREEN);
 		addGateRecipe("Diamond", 80000, GateMaterial.DIAMOND, Chipset.DIAMOND, PipeWire.RED, PipeWire.BLUE,
+				PipeWire.GREEN, PipeWire.YELLOW);
+		addGateRecipe("Emerald", 120000, GateMaterial.EMERALD, Chipset.DIAMOND, PipeWire.RED, PipeWire.BLUE,
 				PipeWire.GREEN, PipeWire.YELLOW);
 
 		// ROBOTS AND BOARDS
@@ -244,7 +271,7 @@ public class BuildCraftSilicon extends BuildCraftMod {
 
 	private static void addGateRecipe(String materialName, double energyCost, GateMaterial material, Chipset chipset,
 			PipeWire... pipeWire) {
-		List temp = new ArrayList();
+		List<ItemStack> temp = new ArrayList<ItemStack>();
 		temp.add(chipset.getStack());
 		for (PipeWire wire : pipeWire) {
 			temp.add(wire.getStack());

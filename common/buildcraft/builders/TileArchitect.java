@@ -18,9 +18,9 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import buildcraft.BuildCraftBuilders;
 import buildcraft.api.blueprints.Translation;
+import buildcraft.api.core.BlockIndex;
 import buildcraft.api.core.IAreaProvider;
 import buildcraft.api.core.NetworkData;
-import buildcraft.core.BlockIndex;
 import buildcraft.core.BlockScanner;
 import buildcraft.core.Box;
 import buildcraft.core.Box.Kind;
@@ -146,7 +146,7 @@ public class TileArchitect extends TileBuildCraft implements IInventory, IBoxPro
 	@RPC (RPCSide.SERVER)
 	public void handleClientSetName(String nameSet) {
 		name = nameSet;
-		RPCHandler.rpcBroadcastPlayers(this, "setName", name);
+		RPCHandler.rpcBroadcastPlayers(worldObj, this, "setName", name);
 	}
 
 	@RPC

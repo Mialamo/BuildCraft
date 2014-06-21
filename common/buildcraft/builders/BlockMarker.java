@@ -25,6 +25,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import buildcraft.BuildCraftCore;
 import buildcraft.core.CreativeTabBuildCraft;
+import buildcraft.core.ItemMapLocation;
 import buildcraft.core.utils.Utils;
 
 public class BlockMarker extends BlockContainer {
@@ -43,17 +44,17 @@ public class BlockMarker extends BlockContainer {
 		ForgeDirection dir = ForgeDirection.getOrientation(meta);
 		switch (dir) {
 			case DOWN:
-				return AxisAlignedBB.getAABBPool().getAABB(0.5F - w, 1F - h, 0.5F - w, 0.5F + w, 1F, 0.5F + w);
+				return AxisAlignedBB.getBoundingBox(0.5F - w, 1F - h, 0.5F - w, 0.5F + w, 1F, 0.5F + w);
 			case UP:
-				return AxisAlignedBB.getAABBPool().getAABB(0.5F - w, 0F, 0.5F - w, 0.5F + w, h, 0.5F + w);
+				return AxisAlignedBB.getBoundingBox(0.5F - w, 0F, 0.5F - w, 0.5F + w, h, 0.5F + w);
 			case SOUTH:
-				return AxisAlignedBB.getAABBPool().getAABB(0.5F - w, 0.5F - w, 0F, 0.5F + w, 0.5F + w, h);
+				return AxisAlignedBB.getBoundingBox(0.5F - w, 0.5F - w, 0F, 0.5F + w, 0.5F + w, h);
 			case NORTH:
-				return AxisAlignedBB.getAABBPool().getAABB(0.5F - w, 0.5F - w, 1 - h, 0.5F + w, 0.5F + w, 1);
+				return AxisAlignedBB.getBoundingBox(0.5F - w, 0.5F - w, 1 - h, 0.5F + w, 0.5F + w, 1);
 			case EAST:
-				return AxisAlignedBB.getAABBPool().getAABB(0F, 0.5F - w, 0.5F - w, h, 0.5F + w, 0.5F + w);
+				return AxisAlignedBB.getBoundingBox(0F, 0.5F - w, 0.5F - w, h, 0.5F + w, 0.5F + w);
 			default:
-				return AxisAlignedBB.getAABBPool().getAABB(1 - h, 0.5F - w, 0.5F - w, 1F, 0.5F + w, 0.5F + w);
+				return AxisAlignedBB.getBoundingBox(1 - h, 0.5F - w, 0.5F - w, 1F, 0.5F + w, 0.5F + w);
 		}
 	}
 
@@ -88,6 +89,11 @@ public class BlockMarker extends BlockContainer {
 
 	@Override
 	public boolean onBlockActivated(World world, int i, int j, int k, EntityPlayer entityplayer, int par6, float par7, float par8, float par9) {
+		if (entityplayer.inventory.getCurrentItem() != null
+				&& entityplayer.inventory.getCurrentItem().getItem() instanceof ItemMapLocation) {
+			return false;
+		}
+
 		TileEntity tile = world.getTileEntity(i, j, k);
 		if (tile instanceof TileMarker) {
 			((TileMarker) tile).tryConnection();

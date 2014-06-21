@@ -35,8 +35,8 @@ import net.minecraftforge.oredict.RecipeSorter;
 import buildcraft.api.blueprints.SchematicRegistry;
 import buildcraft.api.core.IIconProvider;
 import buildcraft.api.core.JavaTools;
-import buildcraft.api.gates.ActionManager;
 import buildcraft.api.gates.GateExpansions;
+import buildcraft.api.gates.StatementManager;
 import buildcraft.api.recipes.BuildcraftRecipeRegistry;
 import buildcraft.api.transport.IExtractionHandler;
 import buildcraft.api.transport.PipeManager;
@@ -227,7 +227,7 @@ public class BuildCraftTransport extends BuildCraftMod {
 				return false;
 			}
 
-			int meta = world.getBlockMetadata(i, j, k);
+			//int meta = world.getBlockMetadata(i, j, k);
 
 			// TODO: the exculded list is not taken into account. This probably
 			// needs to be migrated to an implementation based on names instead
@@ -443,7 +443,7 @@ public class BuildCraftTransport extends BuildCraftMod {
 
 		new BptItemPipeFilters(pipeItemsDiamond);
 
-		ActionManager.registerTriggerProvider(new PipeTriggerProvider());
+		StatementManager.registerTriggerProvider(new PipeTriggerProvider());
 
 		if (BuildCraftCore.loadDefaultRecipes) {
 			loadRecipes();
@@ -493,8 +493,6 @@ public class BuildCraftTransport extends BuildCraftMod {
 	public static Item buildPipe(Class<? extends Pipe> clas,
 			String descr, CreativeTabBuildCraft creativeTab,
 			Object... ingredients) {
-		String name = Character.toLowerCase(clas.getSimpleName().charAt(0)) + clas.getSimpleName().substring(1);
-
 		ItemPipe res = BlockGenericPipe.registerPipe(clas, creativeTab);
 		res.setUnlocalizedName(clas.getSimpleName());
 
@@ -532,5 +530,4 @@ public class BuildCraftTransport extends BuildCraftMod {
 		FMLInterModComms.sendMessage("appliedenergistics2", "whitelist-spatial",
 				TileFilteredBuffer.class.getCanonicalName());
 	}
-
 }

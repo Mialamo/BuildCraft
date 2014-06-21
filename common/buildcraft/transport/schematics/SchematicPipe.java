@@ -23,9 +23,8 @@ import buildcraft.api.blueprints.IBuilderContext;
 import buildcraft.api.blueprints.MappingNotFoundException;
 import buildcraft.api.blueprints.MappingRegistry;
 import buildcraft.api.blueprints.SchematicTile;
-import buildcraft.api.gates.ActionManager;
-import buildcraft.api.gates.IAction;
-import buildcraft.api.gates.ITrigger;
+import buildcraft.api.gates.IStatement;
+import buildcraft.api.gates.StatementManager;
 import buildcraft.transport.BlockGenericPipe;
 import buildcraft.transport.Pipe;
 import buildcraft.transport.TileGenericPipe.SideProperties;
@@ -36,7 +35,7 @@ public class SchematicPipe extends SchematicTile {
 
 	@Override
 	public boolean isAlreadyBuilt(IBuilderContext context, int x, int y, int z) {
-		Pipe pipe = BlockGenericPipe.getPipe(context.world(), x, y, z);
+		Pipe<?> pipe = BlockGenericPipe.getPipe(context.world(), x, y, z);
 
 		if (BlockGenericPipe.isValid(pipe)) {
 			return pipe.item == Item.getItemById(tileNBT.getInteger("pipeId"));
@@ -63,13 +62,13 @@ public class SchematicPipe extends SchematicTile {
 
 		for (int i = 0; i < 8; ++i) {
 			if (gateNBT.hasKey("trigger[" + i + "]")) {
-				ITrigger t = ActionManager.triggers.get(gateNBT.getString("trigger[" + i + "]"));
+				IStatement t = StatementManager.statements.get(gateNBT.getString("trigger[" + i + "]"));
 				t = t.rotateLeft ();
 				gateNBT.setString("trigger[" + i + "]", t.getUniqueTag());
 			}
 
 			if (gateNBT.hasKey("action[" + i + "]")) {
-				IAction a = ActionManager.actions.get(gateNBT.getString("action[" + i + "]"));
+				IStatement a = StatementManager.statements.get(gateNBT.getString("action[" + i + "]"));
 				a = a.rotateLeft ();
 				gateNBT.setString("action[" + i + "]", a.getUniqueTag());
 			}
@@ -91,7 +90,7 @@ public class SchematicPipe extends SchematicTile {
 	@Override
 	public void writeToBlueprint(IBuilderContext context, int x, int y, int z) {
 		TileEntity tile = context.world().getTileEntity(x, y, z);
-		Pipe pipe = BlockGenericPipe.getPipe(context.world(), x, y, z);
+		Pipe<?> pipe = BlockGenericPipe.getPipe(context.world(), x, y, z);
 
 		if (BlockGenericPipe.isValid(pipe)) {
 			tile.writeToNBT(tileNBT);
@@ -116,8 +115,7 @@ public class SchematicPipe extends SchematicTile {
 
 	@Override
 	public void writeRequirementsToBlueprint(IBuilderContext context, int x, int y, int z) {
-		TileEntity tile = context.world().getTileEntity(x, y, z);
-		Pipe pipe = BlockGenericPipe.getPipe(context.world(), x, y, z);
+		Pipe<?> pipe = BlockGenericPipe.getPipe(context.world(), x, y, z);
 
 		if (BlockGenericPipe.isValid(pipe)) {
 			ArrayList<ItemStack> items = pipe.computeItemDrop();
@@ -138,7 +136,7 @@ public class SchematicPipe extends SchematicTile {
 	}
 
 	@Override
-	public BuildingStage getBuildStage () {
+	public BuildingStage getBuildStage() {
 		return BuildingStage.STANDALONE;
 	}
 

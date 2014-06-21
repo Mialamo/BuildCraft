@@ -10,16 +10,16 @@ package buildcraft.transport.triggers;
 
 import java.util.Locale;
 
+import buildcraft.api.gates.IGate;
 import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.ITriggerParameter;
 import buildcraft.api.transport.PipeWire;
-import buildcraft.core.triggers.ActionTriggerIconProvider;
 import buildcraft.core.triggers.BCTrigger;
+import buildcraft.core.triggers.StatementIconProvider;
 import buildcraft.core.utils.StringUtils;
-import buildcraft.transport.IPipeTrigger;
 import buildcraft.transport.Pipe;
 
-public class TriggerPipeSignal extends BCTrigger implements IPipeTrigger {
+public class TriggerPipeSignal extends BCTrigger {
 
 	boolean active;
 	PipeWire color;
@@ -33,8 +33,8 @@ public class TriggerPipeSignal extends BCTrigger implements IPipeTrigger {
 	}
 
 	@Override
-	public boolean hasParameter() {
-		return false;
+	public int maxParameters() {
+		return 3;
 	}
 
 	@Override
@@ -43,12 +43,38 @@ public class TriggerPipeSignal extends BCTrigger implements IPipeTrigger {
 	}
 
 	@Override
-	public boolean isTriggerActive(Pipe pipe, ITriggerParameter parameter) {
+	public boolean isTriggerActive(IGate gate, ITriggerParameter[] parameters) {
+		Pipe<?> pipe = (Pipe<?>) gate.getPipe();
+
 		if (active) {
-			return pipe.signalStrength[color.ordinal()] > 0;
+			if (pipe.signalStrength[color.ordinal()] == 0) {
+				return false;
+			}
 		} else {
-			return pipe.signalStrength[color.ordinal()] == 0;
+			if (pipe.signalStrength[color.ordinal()] > 0) {
+				return false;
+			}
 		}
+
+		for (ITriggerParameter param : parameters) {
+			if (param != null) {
+				TriggerParameterSignal signal = (TriggerParameterSignal) param;
+
+				if (signal.color != null) {
+					if (signal.active) {
+						if (pipe.signalStrength[signal.color.ordinal()] == 0) {
+							return false;
+						}
+					} else {
+						if (pipe.signalStrength[signal.color.ordinal()] > 0) {
+							return false;
+						}
+					}
+				}
+			}
+		}
+
+		return true;
 	}
 
 	@Override
@@ -56,31 +82,37 @@ public class TriggerPipeSignal extends BCTrigger implements IPipeTrigger {
 		if (active) {
 			switch (color) {
 				case RED:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Red_Active;
+					return StatementIconProvider.Trigger_PipeSignal_Red_Active;
 				case BLUE:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Blue_Active;
+					return StatementIconProvider.Trigger_PipeSignal_Blue_Active;
 				case GREEN:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Green_Active;
+					return StatementIconProvider.Trigger_PipeSignal_Green_Active;
 				case YELLOW:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Yellow_Active;
+					return StatementIconProvider.Trigger_PipeSignal_Yellow_Active;
 			}
 		} else {
 			switch (color) {
 				case RED:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Red_Inactive;
+					return StatementIconProvider.Trigger_PipeSignal_Red_Inactive;
 				case BLUE:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Blue_Inactive;
+					return StatementIconProvider.Trigger_PipeSignal_Blue_Inactive;
 				case GREEN:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Green_Inactive;
+					return StatementIconProvider.Trigger_PipeSignal_Green_Inactive;
 				case YELLOW:
-					return ActionTriggerIconProvider.Trigger_PipeSignal_Yellow_Inactive;
+					return StatementIconProvider.Trigger_PipeSignal_Yellow_Inactive;
 			}
 		}
+
 		return -1;
 	}
 
 	@Override
 	public ITrigger rotateLeft() {
 		return this;
+	}
+
+	@Override
+	public ITriggerParameter createParameter(int index) {
+		return new TriggerParameterSignal();
 	}
 }

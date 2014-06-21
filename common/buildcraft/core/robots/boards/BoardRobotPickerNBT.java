@@ -9,7 +9,6 @@
 package buildcraft.core.robots.boards;
 
 import java.util.List;
-import java.util.Random;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayer;
@@ -19,9 +18,10 @@ import net.minecraft.util.IIcon;
 import net.minecraft.util.ResourceLocation;
 
 import buildcraft.api.boards.IBoardParameter;
-import buildcraft.api.boards.IRedstoneBoardRobot;
 import buildcraft.api.boards.RedstoneBoardRegistry;
+import buildcraft.api.boards.RedstoneBoardRobot;
 import buildcraft.api.boards.RedstoneBoardRobotNBT;
+import buildcraft.api.robots.EntityRobotBase;
 import buildcraft.core.robots.EntityRobot;
 import buildcraft.core.utils.NBTUtils;
 import buildcraft.core.utils.StringUtils;
@@ -33,7 +33,6 @@ public final class BoardRobotPickerNBT extends RedstoneBoardRobotNBT {
 	public IIcon icon;
 
 	private BoardRobotPickerNBT() {
-
 	}
 
 	@Override
@@ -47,14 +46,18 @@ public final class BoardRobotPickerNBT extends RedstoneBoardRobotNBT {
 
 		NBTTagCompound nbt = NBTUtils.getItemData(stack);
 
-		if (getParameterNumber(nbt) > 0) {
-			list.add(StringUtils.localize("buildcraft.boardDetail.oneParameter"));
+		int parameterNumber = getParameterNumber(nbt);
+
+		if (parameterNumber > 0) {
+			list.add(parameterNumber + " " + StringUtils.localize("buildcraft.boardDetail.parameters"));
 		}
+
+		list.add(StringUtils.localize("buildcraft.boardDetail.range") + ": " + nbt.getInteger("range"));
 	}
 
 	@Override
-	public IRedstoneBoardRobot create(NBTTagCompound nbt) {
-		return new BoardRobotPicker();
+	public RedstoneBoardRobot create(NBTTagCompound nbt, EntityRobotBase object) {
+		return new BoardRobotPicker(object, nbt);
 	}
 
 	@Override
@@ -68,12 +71,26 @@ public final class BoardRobotPickerNBT extends RedstoneBoardRobotNBT {
 	}
 
 	@Override
-	public void createRandomBoard(NBTTagCompound nbt, Random rand) {
-		float value = rand.nextFloat();
+	public void createRandomBoard(NBTTagCompound nbt) {
+		int parameterNumber = (int) Math.floor(nextFloat(3) * 5);
+		int range = (int) Math.floor(nextFloat(10) * 500) + 10;
 
-		if (value > 0.5) {
-			setParameters(nbt, new IBoardParameter[] {RedstoneBoardRegistry.instance.createParameterStack()});
+		if (parameterNumber > 0) {
+			IBoardParameter[] parameters = new IBoardParameter[parameterNumber];
+
+			for (int i = 0; i < parameterNumber; ++i) {
+				parameters[i] = RedstoneBoardRegistry.instance.createParameterStack();
+			}
+
+			setParameters(nbt, parameters);
 		}
+
+		nbt.setInteger("range", range);
+	}
+
+	@Override
+	public void createDefaultBoard(NBTTagCompound nbt) {
+		nbt.setInteger("range", 250);
 	}
 
 	@Override

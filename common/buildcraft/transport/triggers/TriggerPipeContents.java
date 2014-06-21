@@ -21,11 +21,11 @@ import net.minecraftforge.fluids.FluidContainerRegistry;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTankInfo;
 
+import buildcraft.api.gates.IGate;
 import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.ITriggerParameter;
 import buildcraft.core.triggers.BCTrigger;
 import buildcraft.core.utils.StringUtils;
-import buildcraft.transport.IPipeTrigger;
 import buildcraft.transport.Pipe;
 import buildcraft.transport.PipeTransportFluids;
 import buildcraft.transport.PipeTransportItems;
@@ -33,10 +33,10 @@ import buildcraft.transport.PipeTransportPower;
 import buildcraft.transport.TravelingItem;
 import buildcraft.transport.pipes.PipePowerWood;
 
-public class TriggerPipeContents extends BCTrigger implements IPipeTrigger {
+
+public class TriggerPipeContents extends BCTrigger {
 
 	public enum PipeContents {
-
 		empty,
 		containsItems,
 		containsFluids,
@@ -55,13 +55,13 @@ public class TriggerPipeContents extends BCTrigger implements IPipeTrigger {
 	}
 
 	@Override
-	public boolean hasParameter() {
+	public int maxParameters() {
 		switch (kind) {
-			case containsItems:
-			case containsFluids:
-				return true;
-			default:
-				return false;
+		case containsItems:
+		case containsFluids:
+			return 1;
+		default:
+			return 0;
 		}
 	}
 
@@ -71,17 +71,20 @@ public class TriggerPipeContents extends BCTrigger implements IPipeTrigger {
 	}
 
 	@Override
-	public boolean isTriggerActive(Pipe pipe, ITriggerParameter parameter) {
+	public boolean isTriggerActive(IGate gate, ITriggerParameter[] parameters) {
+		Pipe<?> pipe = (Pipe<?>) gate.getPipe();
+		ITriggerParameter parameter = parameters[0];
+
 		if (pipe.transport instanceof PipeTransportItems) {
 			PipeTransportItems transportItems = (PipeTransportItems) pipe.transport;
-
 			if (kind == PipeContents.empty) {
 				return transportItems.items.isEmpty();
 			} else if (kind == PipeContents.containsItems) {
-				if (parameter != null && parameter.getItemStack() != null) {
+				if (parameter != null && parameter.getItemStackToDraw() != null) {
 					for (TravelingItem item : transportItems.items) {
-						if (item.getItemStack().getItem() == parameter.getItemStack().getItem()
-								&& item.getItemStack().getItemDamage() == parameter.getItemStack().getItemDamage()) {
+						if (item.getItemStack().getItem() == parameter.getItemStackToDraw().getItem()
+								&& item.getItemStack().getItemDamage() == parameter.getItemStackToDraw()
+										.getItemDamage()) {
 							return true;
 						}
 					}
@@ -94,8 +97,8 @@ public class TriggerPipeContents extends BCTrigger implements IPipeTrigger {
 
 			FluidStack searchedFluid = null;
 
-			if (parameter != null && parameter.getItemStack() != null) {
-				searchedFluid = FluidContainerRegistry.getFluidForFilledItem(parameter.getItemStack());
+			if (parameter != null && parameter.getItemStackToDraw() != null) {
+				searchedFluid = FluidContainerRegistry.getFluidForFilledItem(parameter.getItemStackToDraw());
 			}
 
 			if (kind == PipeContents.empty) {

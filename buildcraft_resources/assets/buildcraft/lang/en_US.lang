@@ -1,7 +1,11 @@
 # Master language file
 
-buildcraft.boardRobotPicker=Picker Program
-buildcraft.boardDetail.oneParameter=One Parameter
+buildcraft.boardRobotPicker=Picker
+buildcraft.boardRobotLumberjack=Lumberjack
+buildcraft.boardRobotPlanter=Planter
+buildcraft.boardRobotLeaveCutter=Leave Cutter
+buildcraft.boardDetail.parameters=Parameters
+buildcraft.boardDetail.range=Range
 
 chat.pipe.power.iron.mode=Switched to %d MJ/t limit
 chat.pipe.power.energyConverter=Energy conversion: %s
@@ -46,6 +50,7 @@ gate.action.machine.loop=Loop
 gate.action.pulsar.constant=Energy Pulsar
 gate.action.pulsar.single=Single Energy Pulse
 gate.action.pipe.wire=%s Pipe Signal
+gate.action.robot.goto_station=Goto Station
 
 gate.expansion.fader=Redstone Fader
 gate.expansion.pulsar=Autarchic Pulsar
@@ -145,6 +150,7 @@ item.blueprint.blank=Blank
 item.blueprint.creative_only=Creative Only
 item.blueprint.no_build=No Building
 item.blueprint.incomplete=Incomplete
+item.mapLocation.name=Map Location
 item.PipeItemsWood.name=Wooden Transport Pipe
 item.PipeItemsCobblestone.name=Cobblestone Transport Pipe
 item.PipeItemsStone.name=Stone Transport Pipe

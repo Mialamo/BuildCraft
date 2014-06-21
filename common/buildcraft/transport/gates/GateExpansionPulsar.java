@@ -16,10 +16,10 @@ import net.minecraft.tileentity.TileEntity;
 import buildcraft.BuildCraftTransport;
 import buildcraft.api.gates.GateExpansionController;
 import buildcraft.api.gates.IAction;
+import buildcraft.api.gates.IGate;
 import buildcraft.api.gates.IGateExpansion;
 import buildcraft.api.mj.IBatteryObject;
 import buildcraft.api.mj.MjAPI;
-import buildcraft.transport.TileGenericPipe;
 import buildcraft.transport.triggers.ActionEnergyPulsar;
 import buildcraft.transport.triggers.ActionSingleEnergyPulse;
 
@@ -42,7 +42,6 @@ public final class GateExpansionPulsar extends GateExpansionBuildcraft implement
 		private boolean isActive;
 		private boolean singlePulse;
 		private boolean hasPulsed;
-		private int pulseCount;
 		private int tick;
 
 		public GateExpansionControllerPulsar(TileEntity pipeTile) {
@@ -63,12 +62,12 @@ public final class GateExpansionPulsar extends GateExpansionBuildcraft implement
 		}
 
 		@Override
-		public boolean resolveAction(IAction action, int count) {
+		public boolean resolveAction(IAction action) {
 			if (action instanceof ActionEnergyPulsar) {
-				enablePulse(count);
+				enablePulse();
 				return true;
 			} else if (action instanceof ActionSingleEnergyPulse) {
-				enableSinglePulse(count);
+				enableSinglePulse();
 				return true;
 			}
 			return false;
@@ -82,7 +81,7 @@ public final class GateExpansionPulsar extends GateExpansionBuildcraft implement
 		}
 
 		@Override
-		public void tick() {
+		public void tick(IGate gate) {
 			if (!isActive && hasPulsed) {
 				hasPulsed = false;
 			}
@@ -93,31 +92,32 @@ public final class GateExpansionPulsar extends GateExpansionBuildcraft implement
 			}
 
 			if (!isActive) {
-				((TileGenericPipe) pipeTile).pipe.gate.setPulsing(false);
+				gate.setPulsing(false);
 				return;
 			}
 
 			IBatteryObject battery = MjAPI.getMjBattery(pipeTile);
 
 			if (battery != null && (!singlePulse || !hasPulsed)) {
-				((TileGenericPipe) pipeTile).pipe.gate.setPulsing(true);
-				battery.addEnergy(Math.min(1 << (pulseCount - 1), 64) * 1.01f);
+				gate.setPulsing(true);
+				// TODO: (1 - 1) is coming from pulse count, which has been
+				// removed. The add energy algorithm probably needs to be
+				// reviewed altogether.
+				battery.addEnergy(Math.min(1 << (1 - 1), 64) * 1.01f);
 				hasPulsed = true;
 			} else {
-				((TileGenericPipe) pipeTile).pipe.gate.setPulsing(true);
+				gate.setPulsing(true);
 			}
 		}
 
-		private void enableSinglePulse(int count) {
+		private void enableSinglePulse() {
 			singlePulse = true;
 			isActive = true;
-			pulseCount = count;
 		}
 
-		private void enablePulse(int count) {
+		private void enablePulse() {
 			isActive = true;
 			singlePulse = false;
-			pulseCount = count;
 		}
 
 		private void disablePulse() {
@@ -125,7 +125,6 @@ public final class GateExpansionPulsar extends GateExpansionBuildcraft implement
 				hasPulsed = false;
 			}
 			isActive = false;
-			pulseCount = 0;
 		}
 
 		@Override
@@ -138,7 +137,6 @@ public final class GateExpansionPulsar extends GateExpansionBuildcraft implement
 			nbt.setBoolean("singlePulse", singlePulse);
 			nbt.setBoolean("isActive", isActive);
 			nbt.setBoolean("hasPulsed", hasPulsed);
-			nbt.setInteger("pulseCount", pulseCount);
 			nbt.setInteger("tick", tick);
 		}
 
@@ -147,7 +145,6 @@ public final class GateExpansionPulsar extends GateExpansionBuildcraft implement
 			isActive = nbt.getBoolean("isActive");
 			singlePulse = nbt.getBoolean("singlePulse");
 			hasPulsed = nbt.getBoolean("hasPulsed");
-			pulseCount = nbt.getInteger("pulseCount");
 			tick = nbt.getInteger("tick");
 		}
 	}

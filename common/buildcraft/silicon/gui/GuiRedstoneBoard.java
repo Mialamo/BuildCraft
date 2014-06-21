@@ -11,16 +11,20 @@ package buildcraft.silicon.gui;
 import org.lwjgl.opengl.GL11;
 
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
 
 import buildcraft.api.boards.IBoardParameter;
+import buildcraft.api.boards.IBoardParameterStack;
 import buildcraft.api.boards.RedstoneBoardNBT;
 import buildcraft.api.boards.RedstoneBoardRegistry;
 import buildcraft.core.DefaultProps;
 import buildcraft.core.gui.AdvancedSlot;
 import buildcraft.core.gui.GuiAdvancedInterface;
+import buildcraft.core.gui.ItemSlot;
+import buildcraft.core.network.RPCHandler;
 import buildcraft.core.utils.NBTUtils;
 
 public class GuiRedstoneBoard extends GuiAdvancedInterface {
@@ -30,7 +34,7 @@ public class GuiRedstoneBoard extends GuiAdvancedInterface {
 
 	private World world;
 	private int x, y, z;
-	private RedstoneBoardNBT board;
+	private RedstoneBoardNBT<?> board;
 	private IBoardParameter[] params;
 
 	public GuiRedstoneBoard(EntityPlayer player, int ix, int iy, int iz) {
@@ -47,18 +51,18 @@ public class GuiRedstoneBoard extends GuiAdvancedInterface {
 		board = RedstoneBoardRegistry.instance.getRedstoneBoard(boardNBT);
 		params = board.getParameters(boardNBT);
 
-		slots = new AdvancedSlot [1];
-		slots[0] = new ItemSlot(10, 10);
-		slots[0].drawBackround = true;
+		slots = new AdvancedSlot[params.length];
+
+		for (int i = 0; i < params.length; ++i) {
+			slots[i] = new ItemSlot(this, 10, 10 + i * 20);
+			slots[i].drawBackround = true;
+			((ItemSlot) slots[i]).stack = ((IBoardParameterStack) params[i]).getStack();
+		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void initGui() {
 		super.initGui();
-		int xscreen = (width - xSize) / 2;
-		int yscreen = (height - ySize) / 2;
-
 	}
 
 	@Override
@@ -70,6 +74,13 @@ public class GuiRedstoneBoard extends GuiAdvancedInterface {
 		drawTexturedModalRect(j, k, 0, 0, xSize, ySize);
 
 		drawBackgroundSlots();
+	}
+
+	@Override
+	protected void drawGuiContainerForegroundLayer(int par1, int par2) {
+		super.drawGuiContainerForegroundLayer(par1, par2);
+
+		drawTooltipForSlotAt(par1, par2);
 	}
 
 	@Override
@@ -90,7 +101,10 @@ public class GuiRedstoneBoard extends GuiAdvancedInterface {
 		slot = slots[position];
 
 		if (slot instanceof ItemSlot) {
-			((ItemSlot) slot).stack = mc.thePlayer.inventory.getItemStack();
+			ItemStack stackCopy = mc.thePlayer.inventory.getItemStack().copy();
+			stackCopy.stackSize = 1;
+			((ItemSlot) slot).stack = stackCopy;
+			RPCHandler.rpcServer(container, "setParameterStack", position, stackCopy);
 		}
 	}
 }

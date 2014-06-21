@@ -9,14 +9,11 @@
 package buildcraft.transport;
 
 import java.util.BitSet;
-import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.collect.HashMultiset;
-import com.google.common.collect.Multiset;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -27,34 +24,43 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import buildcraft.BuildCraftTransport;
-import buildcraft.api.gates.ActionManager;
 import buildcraft.api.gates.GateExpansionController;
 import buildcraft.api.gates.IAction;
+import buildcraft.api.gates.IActionParameter;
 import buildcraft.api.gates.IActionReceptor;
+import buildcraft.api.gates.IGate;
 import buildcraft.api.gates.IGateExpansion;
-import buildcraft.api.gates.ITileTrigger;
 import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.ITriggerParameter;
-import buildcraft.api.gates.TriggerParameter;
+import buildcraft.api.gates.StatementManager;
+import buildcraft.api.gates.TriggerParameterItemStack;
+import buildcraft.api.transport.IPipe;
 import buildcraft.api.transport.PipeWire;
 import buildcraft.core.GuiIds;
 import buildcraft.core.triggers.ActionRedstoneOutput;
 import buildcraft.transport.gates.GateDefinition.GateLogic;
 import buildcraft.transport.gates.GateDefinition.GateMaterial;
 import buildcraft.transport.gates.ItemGate;
+import buildcraft.transport.gui.ContainerGateInterface;
 import buildcraft.transport.triggers.ActionRedstoneFaderOutput;
-import buildcraft.transport.triggers.ActionSignalOutput;
 
-public final class Gate {
+public final class Gate implements IGate {
 
-	public final Pipe pipe;
+	public static int MAX_STATEMENTS = 8;
+	public static int MAX_PARAMETERS = 3;
+
+	public final Pipe<?> pipe;
 	public final GateMaterial material;
 	public final GateLogic logic;
 	public final BiMap<IGateExpansion, GateExpansionController> expansions = HashBiMap.create();
-	public ITrigger[] triggers = new ITrigger[8];
-	public ITriggerParameter[] triggerParameters = new ITriggerParameter[8];
-	public IAction[] actions = new IAction[8];
-	public ActionState[] actionsState = new ActionState[8];
+
+	public ITrigger[] triggers = new ITrigger[MAX_STATEMENTS];
+	public ITriggerParameter[][] triggerParameters = new ITriggerParameter[8][MAX_PARAMETERS];
+
+	public IAction[] actions = new IAction[MAX_STATEMENTS];
+	public IActionParameter[][] actionParameters = new IActionParameter[8][MAX_PARAMETERS];
+
+	public ActionState[] actionsState = new ActionState[MAX_STATEMENTS];
 
 	public BitSet broadcastSignal = new BitSet(PipeWire.VALUES.length);
 	public BitSet prevBroadcastSignal = new BitSet(PipeWire.VALUES.length);
@@ -67,12 +73,14 @@ public final class Gate {
 	 */
 	public boolean isPulsing = false;
 	private float pulseStage = 0;
+	private ForgeDirection direction;
 
 	// / CONSTRUCTOR
-	public Gate(Pipe pipe, GateMaterial material, GateLogic logic) {
+	public Gate(Pipe<?> pipe, GateMaterial material, GateLogic logic, ForgeDirection direction) {
 		this.pipe = pipe;
 		this.material = material;
 		this.logic = logic;
+		this.direction = direction;
 
 		for (int i = 0; i < actionsState.length; ++i) {
 			actionsState[i] = ActionState.Deactivated;
@@ -95,12 +103,28 @@ public final class Gate {
 		return actions[position];
 	}
 
-	public void setTriggerParameter(int position, ITriggerParameter p) {
-		triggerParameters[position] = p;
+	public void setTriggerParameter(int trigger, int param, ITriggerParameter p) {
+		triggerParameters[trigger][param] = p;
 	}
 
-	public ITriggerParameter getTriggerParameter(int position) {
-		return triggerParameters[position];
+	public void setActionParameter(int action, int param, IActionParameter p) {
+		actionParameters[action][param] = p;
+	}
+
+	public ITriggerParameter getTriggerParameter(int trigger, int param) {
+		return triggerParameters[trigger][param];
+	}
+
+	public IActionParameter getActionParameter(int action, int param) {
+		return actionParameters[action][param];
+	}
+
+	public ForgeDirection getDirection() {
+		return direction;
+	}
+
+	public void setDirection(ForgeDirection direction) {
+		this.direction = direction;
 	}
 
 	public void addGateExpansion(IGateExpansion expansion) {
@@ -113,6 +137,7 @@ public final class Gate {
 	public void writeToNBT(NBTTagCompound data) {
 		data.setString("material", material.name());
 		data.setString("logic", logic.name());
+		data.setInteger("direction", direction.ordinal());
 		NBTTagList exList = new NBTTagList();
 		for (GateExpansionController con : expansions.values()) {
 			NBTTagCompound conNBT = new NBTTagCompound();
@@ -128,33 +153,68 @@ public final class Gate {
 			if (triggers[i] != null) {
 				data.setString("trigger[" + i + "]", triggers[i].getUniqueTag());
 			}
+
 			if (actions[i] != null) {
 				data.setString("action[" + i + "]", actions[i].getUniqueTag());
 			}
-			if (triggerParameters[i] != null) {
-				NBTTagCompound cpt = new NBTTagCompound();
-				triggerParameters[i].writeToNBT(cpt);
-				data.setTag("triggerParameters[" + i + "]", cpt);
+
+			for (int j = 0; j < 3; ++j) {
+				if (triggerParameters[i][j] != null) {
+					NBTTagCompound cpt = new NBTTagCompound();
+					cpt.setString("kind", StatementManager.getParameterKind(triggerParameters[i][j]));
+					triggerParameters[i][j].writeToNBT(cpt);
+					data.setTag("triggerParameters[" + i + "][" + j + "]", cpt);
+				}
+			}
+
+			for (int j = 0; j < 3; ++j) {
+				if (actionParameters[i][j] != null) {
+					NBTTagCompound cpt = new NBTTagCompound();
+					cpt.setString("kind", StatementManager.getParameterKind(actionParameters[i][j]));
+					actionParameters[i][j].writeToNBT(cpt);
+					data.setTag("actionParameters[" + i + "][" + j + "]", cpt);
+				}
 			}
 		}
 
 		for (PipeWire wire : PipeWire.VALUES) {
 			data.setBoolean("wireState[" + wire.ordinal() + "]", broadcastSignal.get(wire.ordinal()));
 		}
+
 		data.setByte("redstoneOutput", (byte) redstoneOutput);
 	}
 
 	public void readFromNBT(NBTTagCompound data) {
 		for (int i = 0; i < 8; ++i) {
 			if (data.hasKey("trigger[" + i + "]")) {
-				triggers[i] = ActionManager.triggers.get(data.getString("trigger[" + i + "]"));
+				triggers[i] = (ITrigger) StatementManager.statements.get(data.getString("trigger[" + i + "]"));
 			}
+
 			if (data.hasKey("action[" + i + "]")) {
-				actions[i] = ActionManager.actions.get(data.getString("action[" + i + "]"));
+				actions[i] = (IAction) StatementManager.statements.get(data.getString("action[" + i + "]"));
 			}
+
+			// This is for legacy trigger loading
 			if (data.hasKey("triggerParameters[" + i + "]")) {
-				triggerParameters[i] = new TriggerParameter();
-				triggerParameters[i].readFromNBT(data.getCompoundTag("triggerParameters[" + i + "]"));
+				triggerParameters[i][0] = new TriggerParameterItemStack();
+				triggerParameters[i][0].readFromNBT(data.getCompoundTag("triggerParameters[" + i + "]"));
+			}
+
+			for (int j = 0; j < 3; ++j) {
+				if (data.hasKey("triggerParameters[" + i + "][" + j + "]")) {
+					NBTTagCompound cpt = data.getCompoundTag("triggerParameters[" + i + "][" + j + "]");
+					triggerParameters[i][j] = (ITriggerParameter) StatementManager.createParameter(cpt
+							.getString("kind"));
+					triggerParameters[i][j].readFromNBT(cpt);
+				}
+			}
+
+			for (int j = 0; j < 3; ++j) {
+				if (data.hasKey("actionParameters[" + i + "][" + j + "]")) {
+					NBTTagCompound cpt = data.getCompoundTag("actionParameters[" + i + "][" + j + "]");
+					actionParameters[i][j] = (IActionParameter) StatementManager.createParameter(cpt.getString("kind"));
+					actionParameters[i][j].readFromNBT(cpt);
+				}
 			}
 		}
 
@@ -168,6 +228,7 @@ public final class Gate {
 	public void openGui(EntityPlayer player) {
 		if (!player.worldObj.isRemote) {
 			player.openGui(BuildCraftTransport.instance, GuiIds.GATES, pipe.container.getWorldObj(), pipe.container.xCoord, pipe.container.yCoord, pipe.container.zCoord);
+			((ContainerGateInterface) player.openContainer).setGate(direction.ordinal());
 		}
 	}
 
@@ -177,7 +238,7 @@ public final class Gate {
 	 *  or to synchronize that with the server as this is only for animation.
 	 */
 	public void updatePulse () {
-		if (pipe.container.renderState.isGatePulsing () || pulseStage > 0.11F) {
+		if (pipe.container.renderState.gateMatrix.isGatePulsing(direction) || pulseStage > 0.11F) {
 			// if it is moving, or is still in a moved state, then complete
 			// the current movement
 			pulseStage = (pulseStage + 0.01F) % 1F;
@@ -186,10 +247,10 @@ public final class Gate {
 		}
 	}
 
-	// / UPDATING
+	// UPDATING
 	public void tick() {
 		for (GateExpansionController expansion : expansions.values()) {
-			expansion.tick();
+			expansion.tick(this);
 		}
 	}
 
@@ -209,12 +270,13 @@ public final class Gate {
 	}
 
 	public boolean isGateActive() {
-		for (GateExpansionController expansion : expansions.values()) {
-			if (expansion.isActive()) {
+		for (ActionState state : actionsState) {
+			if (state == ActionState.Activated) {
 				return true;
 			}
 		}
-		return redstoneOutput > 0 || !broadcastSignal.isEmpty();
+
+		return false;
 	}
 
 	public boolean isGatePulsing() {
@@ -243,53 +305,67 @@ public final class Gate {
 		// Tell the gate to prepare for resolving actions. (Disable pulser)
 		startResolution();
 
-		Map<IAction, Boolean> activeActions = new HashMap<IAction, Boolean>();
-		Multiset<IAction> actionCount = HashMultiset.create();
+		int [] actionGroups = new int [] {0, 1, 2, 3, 4, 5, 6, 7};
 
-		// Computes the actions depending on the triggers
-		for (int it = 0; it < 8; ++it) {
-			ITrigger trigger = triggers[it];
-			IAction action = actions[it];
-			ITriggerParameter parameter = triggerParameters[it];
+		for (int i = 0; i < MAX_PARAMETERS; ++i) {
+			for (int j = i - 1; j >= 0; --j) {
+				if (actions[i] != null && actions[j] != null
+						&& actions[i].getUniqueTag().equals(actions[j].getUniqueTag())) {
 
-			actionsState [it] = ActionState.Deactivated;
+					boolean sameParams = true;
 
-			if (trigger != null && action != null) {
-				actionCount.add(action);
+					for (int p = 0; p < MAX_PARAMETERS; ++p) {
+						if ((actionParameters[i][p] != null && actionParameters[j][p] == null)
+								|| (actionParameters[i][p] == null && actionParameters[j][p] != null)
+								|| (actionParameters[i][p] != null
+										&& actionParameters[j][p] != null
+										&& !actionParameters[i][p].equals(actionParameters[j][p]))) {
+							sameParams = false;
+						}
+					}
 
-				boolean active = isNearbyTriggerActive(trigger, parameter);
-
-				if (!activeActions.containsKey(action)) {
-					activeActions.put(action, active);
-				} else if (logic == GateLogic.AND) {
-					activeActions.put(action, activeActions.get(action) && active);
-				} else {
-					activeActions.put(action, activeActions.get(action) || active);
-				}
-
-				if (active) {
-					actionsState [it] = ActionState.Partial;
+					if (sameParams) {
+						actionGroups[i] = j;
+					}
 				}
 			}
 		}
 
-		for (int it = 0; it < 8; ++it) {
-			IAction action = actions[it];
+		// Computes the actions depending on the triggers
+		for (int it = 0; it < MAX_STATEMENTS; ++it) {
+			actionsState[it] = ActionState.Deactivated;
 
-			if (activeActions.containsKey(action)) {
-				if (activeActions.get(action)) {
-					actionsState[it] = ActionState.Activated;
+			ITrigger trigger = triggers[it];
+			ITriggerParameter[] parameter = triggerParameters[it];
+
+			if (trigger != null) {
+				boolean active = isTriggerActive(trigger, parameter);
+
+				if (actionGroups[it] == it) {
+					if (active) {
+						actionsState[it] = ActionState.Activated;
+					}
+				} else {
+					if (active && actionsState[actionGroups[it]] != ActionState.Activated) {
+						actionsState[actionGroups[it]] = ActionState.Partial;
+					} else if (!active && actionsState[actionGroups[it]] == ActionState.Activated) {
+						actionsState[actionGroups[it]] = ActionState.Partial;
+					}
 				}
 			}
 		}
 
 		// Activate the actions
-		for (Map.Entry<IAction, Boolean> entry : activeActions.entrySet()) {
-			if (entry.getValue()) {
-				IAction action = entry.getKey();
+		for (int it = 0; it < MAX_STATEMENTS; ++it) {
+			if (actions[it] != null && actionGroups[it] == it && actionsState[it] == ActionState.Activated) {
+				IAction action = actions[it];
+				action.actionActivate(this, actionParameters[it]);
+
+				// TODO: A lot of the code below should be removed in favor
+				// of calls to actionActivate
 
 				// Custom gate actions take precedence over defaults.
-				if (resolveAction(action, actionCount.count(action))) {
+				if (resolveAction(action)) {
 					continue;
 				}
 
@@ -297,8 +373,6 @@ public final class Gate {
 					redstoneOutput = 15;
 				} else if (action instanceof ActionRedstoneFaderOutput) {
 					redstoneOutput = ((ActionRedstoneFaderOutput) action).level;
-				} else if (action instanceof ActionSignalOutput) {
-					broadcastSignal.set(((ActionSignalOutput) action).color.ordinal());
 				} else {
 					for (ForgeDirection side : ForgeDirection.VALID_DIRECTIONS) {
 						TileEntity tile = pipe.container.getTile(side);
@@ -308,6 +382,14 @@ public final class Gate {
 						}
 					}
 				}
+			}
+		}
+
+		LinkedList<IAction> activeActions = new LinkedList<IAction>();
+
+		for (int it = 0; it < MAX_STATEMENTS; ++it) {
+			if (actionGroups[it] == it && actionsState[it] == ActionState.Activated) {
+				activeActions.add(actions[it]);
 			}
 		}
 
@@ -326,38 +408,28 @@ public final class Gate {
 		}
 	}
 
-	public boolean resolveAction(IAction action, int count) {
+	public boolean resolveAction(IAction action) {
 		for (GateExpansionController expansion : expansions.values()) {
-			if (expansion.resolveAction(action, count)) {
+			if (expansion.resolveAction(action)) {
 				return true;
 			}
 		}
 		return false;
 	}
 
-	public boolean isNearbyTriggerActive(ITrigger trigger, ITriggerParameter parameter) {
+	public boolean isTriggerActive(ITrigger trigger, ITriggerParameter[] parameters) {
 		if (trigger == null) {
 			return false;
 		}
 
-		if (trigger instanceof IPipeTrigger) {
-			return ((IPipeTrigger) trigger).isTriggerActive(pipe, parameter);
+		if (trigger.isTriggerActive(this, parameters)) {
+			return true;
 		}
 
-		if (trigger instanceof ITileTrigger) {
-			for (ForgeDirection o : ForgeDirection.VALID_DIRECTIONS) {
-				TileEntity tile = pipe.container.getTile(o);
-				if (tile != null && !(tile instanceof TileGenericPipe) && pipe.hasGate(o)) {
-					if (((ITileTrigger) trigger).isTriggerActive(o.getOpposite(), tile, parameter)) {
-						return true;
-					}
-				}
-			}
-			return false;
-		}
-
+		// TODO: This can probably be refactored with regular triggers instead
+		// of yet another system.
 		for (GateExpansionController expansion : expansions.values()) {
-			if (expansion.isTriggerActive(trigger, parameter)) {
+			if (expansion.isTriggerActive(trigger, parameters[0])) {
 				return true;
 			}
 		}
@@ -365,7 +437,7 @@ public final class Gate {
 		return false;
 	}
 
-	// / TRIGGERS
+	// TRIGGERS
 	public void addTrigger(List<ITrigger> list) {
 
 		for (PipeWire wire : PipeWire.VALUES) {
@@ -380,7 +452,7 @@ public final class Gate {
 		}
 	}
 
-	// / ACTIONS
+	// ACTIONS
 	public void addActions(List<IAction> list) {
 		for (PipeWire wire : PipeWire.VALUES) {
 			if (pipe.wireSet[wire.ordinal()] && material.ordinal() >= wire.ordinal()) {
@@ -393,14 +465,29 @@ public final class Gate {
 		}
 	}
 
-	public void setPulsing (boolean pulsing) {
+	@Override
+	public void setPulsing(boolean pulsing) {
 		if (pulsing != isPulsing) {
 			isPulsing = pulsing;
 			pipe.container.scheduleRenderUpdate();
 		}
 	}
 
-	public float getPulseStage () {
+	public float getPulseStage() {
 		return pulseStage;
+	}
+
+	public void broadcastSignal(PipeWire color) {
+		broadcastSignal.set(color.ordinal());
+	}
+
+	@Override
+	public IPipe getPipe() {
+		return pipe;
+	}
+
+	@Override
+	public ForgeDirection getSide() {
+		return direction;
 	}
 }

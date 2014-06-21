@@ -8,9 +8,10 @@
  */
 package buildcraft.core.robots;
 
+import java.util.Date;
+
 import io.netty.buffer.ByteBuf;
 
-import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
@@ -19,19 +20,28 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
 
 import cpw.mods.fml.common.registry.IEntityAdditionalSpawnData;
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
 
 import net.minecraftforge.common.util.ForgeDirection;
 
-import buildcraft.api.boards.IRedstoneBoardRobot;
 import buildcraft.api.boards.RedstoneBoardNBT;
 import buildcraft.api.boards.RedstoneBoardRegistry;
+import buildcraft.api.boards.RedstoneBoardRobot;
 import buildcraft.api.boards.RedstoneBoardRobotNBT;
 import buildcraft.api.core.SafeTimeTracker;
+import buildcraft.api.robots.AIRobot;
+import buildcraft.api.robots.DockingStationRegistry;
+import buildcraft.api.robots.EntityRobotBase;
+import buildcraft.api.robots.IDockingStation;
 import buildcraft.core.DefaultProps;
 import buildcraft.core.LaserData;
-import buildcraft.transport.TileGenericPipe;
+import buildcraft.core.network.RPC;
+import buildcraft.core.network.RPCHandler;
+import buildcraft.core.network.RPCMessageInfo;
+import buildcraft.core.network.RPCSide;
 
-public class EntityRobot extends EntityLiving implements
+public class EntityRobot extends EntityRobotBase implements
 		IEntityAdditionalSpawnData, IInventory {
 
 	public static final ResourceLocation ROBOT_BASE = new ResourceLocation("buildcraft",
@@ -40,40 +50,50 @@ public class EntityRobot extends EntityLiving implements
 			DefaultProps.TEXTURE_PATH_ENTITIES + "/robot_builder.png");
 	public static final ResourceLocation ROBOT_TRANSPORT = new ResourceLocation("buildcraft",
 			DefaultProps.TEXTURE_PATH_ENTITIES + "/robot_picker.png");
+	public static final ResourceLocation ROBOT_FACTORY = new ResourceLocation("buildcraft",
+			DefaultProps.TEXTURE_PATH_ENTITIES + "/robot_factory.png");
 
 	private static ResourceLocation defaultTexture = new ResourceLocation("buildcraft", DefaultProps.TEXTURE_PATH_ENTITIES + "/robot_base.png");
 
 	public SafeTimeTracker scanForTasks = new SafeTimeTracker (40, 10);
 
-	public LaserData laser = new LaserData ();
-	public IRobotTask currentTask;
-	public DockingStation dockingStation = new DockingStation();
+	public LaserData laser = new LaserData();
+	public DockingStation reservedDockingStation;
+	public DockingStation linkedDockingStation;
 	public boolean isDocked = false;
 
-	public IRedstoneBoardRobot board;
+	public RedstoneBoardRobot board;
+	public AIRobotMain mainAI;
 
-	public RobotAIBase currentAI;
-	protected RobotAIBase nextAI;
+	public ItemStack itemInUse;
+	public float itemAngle1 = 0;
+	public float itemAngle2 = 0;
+	public boolean itemActive = false;
+	public float itemActiveStage = 0;
+	public long lastUpdateTime = 0;
 
 	private boolean needsUpdate = false;
 	private ItemStack[] inv = new ItemStack[6];
 	private String boardID;
 	private ResourceLocation texture;
+	private DockingStation currentDockingStation;
 
-	public class DockingStation {
-		public int x, y, z;
-		public ForgeDirection side;
-	}
+	private double mjStored;
 
-	public EntityRobot(World world, IRedstoneBoardRobot iBoard) {
+	public EntityRobot(World world, NBTTagCompound boardNBT) {
 		this(world);
 
-		board = iBoard;
+		board = (RedstoneBoardRobot) RedstoneBoardRegistry.instance.getRedstoneBoard(boardNBT).create(boardNBT, this);
 		dataWatcher.updateObject(16, board.getNBTHandler().getID());
+
+		if (!world.isRemote) {
+			mainAI = new AIRobotMain(this);
+			mainAI.start();
+		}
 	}
 
-	public EntityRobot(World par1World) {
-		super(par1World);
+	public EntityRobot(World world) {
+		super(world);
 
 		motionX = 0;
 		motionY = 0;
@@ -81,6 +101,7 @@ public class EntityRobot extends EntityLiving implements
 
 		ignoreFrustumCheck = true;
 		laser.isVisible = false;
+		entityCollisionReduction = 1F;
 
 		width = 0.5F;
 		height = 0.5F;
@@ -89,6 +110,8 @@ public class EntityRobot extends EntityLiving implements
 	@Override
 	protected void entityInit() {
 		super.entityInit();
+
+		setNullBoundingBox();
 
 		preventEntitySpawning = false;
 		noClip = true;
@@ -99,6 +122,8 @@ public class EntityRobot extends EntityLiving implements
 		dataWatcher.addObject(14, Float.valueOf(0));
 		dataWatcher.addObject(15, Byte.valueOf((byte) 0));
 		dataWatcher.addObject(16, "");
+		dataWatcher.addObject(17, Float.valueOf(0));
+		dataWatcher.addObject(18, Float.valueOf(0));
 	}
 
 	protected void updateDataClient() {
@@ -107,12 +132,15 @@ public class EntityRobot extends EntityLiving implements
 		laser.tail.z = dataWatcher.getWatchableObjectFloat(14);
 		laser.isVisible = dataWatcher.getWatchableObjectByte(15) == 1;
 
-		RedstoneBoardNBT boardNBT = RedstoneBoardRegistry.instance.getRedstoneBoard(dataWatcher
+		RedstoneBoardNBT<?> boardNBT = RedstoneBoardRegistry.instance.getRedstoneBoard(dataWatcher
 				.getWatchableObjectString(16));
 
 		if (boardNBT != null) {
 			texture = ((RedstoneBoardRobotNBT) boardNBT).getRobotTexture();
 		}
+
+		itemAngle1 = dataWatcher.getWatchableObjectFloat(17);
+		itemAngle2 = dataWatcher.getWatchableObjectFloat(18);
 	}
 
 	protected void updateDataServer() {
@@ -120,10 +148,14 @@ public class EntityRobot extends EntityLiving implements
 		dataWatcher.updateObject(13, Float.valueOf((float) laser.tail.y));
 		dataWatcher.updateObject(14, Float.valueOf((float) laser.tail.z));
 		dataWatcher.updateObject(15, Byte.valueOf((byte) (laser.isVisible ? 1 : 0)));
+		dataWatcher.updateObject(17, Float.valueOf(itemAngle1));
+		dataWatcher.updateObject(18, Float.valueOf(itemAngle2));
 	}
 
 	protected void init() {
-
+		if (worldObj.isRemote) {
+			RPCHandler.rpcServer(this, "requestInitialization");
+		}
 	}
 
 	public void setLaserDestination (float x, float y, float z) {
@@ -136,14 +168,14 @@ public class EntityRobot extends EntityLiving implements
 		}
 	}
 
-	public void showLaser () {
+	public void showLaser() {
 		if (!laser.isVisible) {
 			laser.isVisible = true;
 			needsUpdate = true;
 		}
 	}
 
-	public void hideLaser () {
+	public void hideLaser() {
 		if (laser.isVisible) {
 			laser.isVisible = false;
 			needsUpdate = true;
@@ -161,36 +193,23 @@ public class EntityRobot extends EntityLiving implements
 			updateDataClient();
 		}
 
-		if (nextAI != null) {
-			if (currentAI != null) {
-				tasks.removeTask(currentAI);
-			}
-
-			currentAI = nextAI;
-			nextAI = null;
-			tasks.addTask(0, currentAI);
+		if (currentDockingStation != null) {
+			motionX = 0;
+			motionY = 0;
+			motionZ = 0;
+			posX = currentDockingStation.pipe.xCoord + 0.5F + currentDockingStation.side.offsetX * 0.5F;
+			posY = currentDockingStation.pipe.yCoord + 0.5F + currentDockingStation.side.offsetY * 0.5F;
+			posZ = currentDockingStation.pipe.zCoord + 0.5F + currentDockingStation.side.offsetZ * 0.5F;
 		}
 
 		if (!worldObj.isRemote) {
-			board.updateBoard(this);
-
-			if (currentTask == null) {
-				if (scanForTasks.markTimeIfDelay(worldObj)) {
-					RobotTaskProviderRegistry.scanForTask(this);
-				}
-			} else {
-				if (currentTask.done()) {
-					currentTask = null;
-				} else {
-					currentTask.update(this);
-				}
-			}
+			mainAI.cycle();
 		}
 
 		super.onUpdate();
 	}
 
-	public void setRegularBoundingBox () {
+	public void setRegularBoundingBox() {
 		width = 0.5F;
 		height = 0.5F;
 
@@ -221,7 +240,7 @@ public class EntityRobot extends EntityLiving implements
 		}
 	}
 
-	public void setNullBoundingBox () {
+	public void setNullBoundingBox() {
 		width = 0F;
 		height = 0F;
 
@@ -234,16 +253,12 @@ public class EntityRobot extends EntityLiving implements
 		boundingBox.maxZ = posZ;
 	}
 
-	private void iterateBehaviorDocked () {
+	private void iterateBehaviorDocked() {
 		motionX = 0F;
 		motionY = 0F;
 		motionZ = 0F;
 
 		setNullBoundingBox ();
-	}
-
-	protected void move() {
-
 	}
 
 	@Override
@@ -258,13 +273,11 @@ public class EntityRobot extends EntityLiving implements
 
 	@Override
 	public ItemStack getHeldItem() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
 	public void setCurrentItemOrArmor(int i, ItemStack itemstack) {
-		// TODO Auto-generated method stub
 	}
 
 	@Override
@@ -297,13 +310,11 @@ public class EntityRobot extends EntityLiving implements
     public void writeEntityToNBT(NBTTagCompound nbt) {
 		super.writeEntityToNBT(nbt);
 
-		nbt.setInteger("dockX", dockingStation.x);
-		nbt.setInteger("dockY", dockingStation.y);
-		nbt.setInteger("dockZ", dockingStation.z);
-		nbt.setInteger("dockSide", dockingStation.side.ordinal());
-
-		if (currentAI != null) {
-			nbt.setString("ai", currentAI.getClass().getCanonicalName());
+		if (linkedDockingStation != null) {
+			nbt.setInteger("dockX", linkedDockingStation.pipe.xCoord);
+			nbt.setInteger("dockY", linkedDockingStation.pipe.yCoord);
+			nbt.setInteger("dockZ", linkedDockingStation.pipe.zCoord);
+			nbt.setInteger("dockSide", linkedDockingStation.side.ordinal());
 		}
 
 		NBTTagCompound nbtLaser = new NBTTagCompound();
@@ -323,10 +334,13 @@ public class EntityRobot extends EntityLiving implements
 	public void readEntityFromNBT(NBTTagCompound nbt) {
 		super.readEntityFromNBT(nbt);
 
-		dockingStation.x = nbt.getInteger("dockX");
-		dockingStation.y = nbt.getInteger("dockY");
-		dockingStation.z = nbt.getInteger("dockZ");
-		dockingStation.side = ForgeDirection.values () [nbt.getInteger("dockSide")];
+		if (nbt.hasKey("dockX")) {
+			linkedDockingStation = (DockingStation) DockingStationRegistry.getStation(
+					nbt.getInteger("dockX"),
+					nbt.getInteger("dockY"),
+					nbt.getInteger("dockZ"),
+					ForgeDirection.values()[nbt.getInteger("dockSide")]);
+		}
 
 		/*
 		 * if (nbt.hasKey("ai")) { try { nextAI = (RobotAIBase)
@@ -343,16 +357,76 @@ public class EntityRobot extends EntityLiving implements
 		setDead();
     }
 
-	public void setDockingStation (TileGenericPipe tile, ForgeDirection side) {
-		dockingStation.x = tile.xCoord;
-		dockingStation.y = tile.yCoord;
-		dockingStation.z = tile.zCoord;
-		dockingStation.side = side;
+	@Override
+	public void dock(IDockingStation station) {
+		currentDockingStation = (DockingStation) station;
+	}
+
+	@Override
+	public void undock() {
+		if (currentDockingStation != null) {
+			currentDockingStation.release(this);
+			currentDockingStation = null;
+		}
+	}
+
+	@Override
+	public DockingStation getDockingStation() {
+		return currentDockingStation;
+	}
+
+	@Override
+	public boolean reserveStation(IDockingStation iStation) {
+		DockingStation station = (DockingStation) iStation;
+
+		if (station == null) {
+			if (reservedDockingStation != null) {
+				reservedDockingStation.release(this);
+			}
+
+			reservedDockingStation = null;
+
+			return true;
+		}
+
+		if (station.reserved() == this) {
+			return true;
+		}
+
+		if (station.reserve(this)) {
+			if (reservedDockingStation != null) {
+				reservedDockingStation.release(this);
+			}
+
+			reservedDockingStation = station;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	@Override
+	public boolean linkToStation(IDockingStation iStation) {
+		DockingStation station = (DockingStation) iStation;
+
+		if (station.linked() == this) {
+			return true;
+		}
+
+		if (station.link(this)) {
+			if (linkedDockingStation != null) {
+				linkedDockingStation.unlink(this);
+			}
+
+			linkedDockingStation = station;
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	@Override
 	public ItemStack getEquipmentInSlot(int var1) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
@@ -363,10 +437,6 @@ public class EntityRobot extends EntityLiving implements
 	@Override
 	protected boolean isAIEnabled() {
 		return true;
-	}
-
-	public void setMainAI (RobotAIBase ai) {
-		nextAI = ai;
 	}
 
 	@Override
@@ -436,7 +506,123 @@ public class EntityRobot extends EntityLiving implements
 	public boolean isItemValidForSlot(int var1, ItemStack var2) {
 		return inv[var1] == null
 				|| (inv[var1].isItemEqual(var2) && inv[var1].isStackable() && inv[var1].stackSize
-						+ var2.stackSize <= inv[var1].getItem()
-						.getItemStackLimit());
+						+ var2.stackSize <= inv[var1].getItem().getItemStackLimit());
 	}
+
+	@Override
+	public boolean isMoving() {
+		return motionX != 0 || motionY != 0 || motionZ != 0;
+	}
+
+	@Override
+	public void setItemInUse(ItemStack stack) {
+		itemInUse = stack;
+		RPCHandler.rpcBroadcastPlayers(worldObj, this, "clientSetItemInUse", stack);
+	}
+
+	@RPC(RPCSide.CLIENT)
+	private void clientSetItemInUse(ItemStack stack) {
+		itemInUse = stack;
+	}
+
+	@RPC(RPCSide.SERVER)
+	public void requestInitialization(RPCMessageInfo info) {
+		RPCHandler.rpcPlayer(info.sender, this, "rpcInitialize", itemInUse, itemActive);
+	}
+
+	@RPC(RPCSide.CLIENT)
+	private void rpcInitialize(ItemStack stack, boolean active) {
+		itemInUse = stack;
+		itemActive = active;
+	}
+
+	@Override
+	public void setHealth(float par1) {
+		// deactivate healh management
+	}
+
+	@Override
+	public void aimItemAt(int x, int y, int z) {
+		itemAngle1 = (float) Math.atan2(z - Math.floor(posZ),
+				x - Math.floor(posX));
+
+		itemAngle2 = 0;
+
+		if (Math.floor(posY) < y) {
+			itemAngle2 = (float) -Math.PI / 4;
+
+			if (Math.floor(posX) == x && Math.floor(posZ) == z) {
+				itemAngle2 -= (float) Math.PI / 4;
+			}
+		} else if (Math.floor(posY) > y) {
+			itemAngle2 = (float) Math.PI / 2;
+
+			if (Math.floor(posX) == x && Math.floor(posZ) == z) {
+				itemAngle2 += (float) Math.PI / 4;
+			}
+		}
+
+		updateDataServer();
+	}
+
+	@Override
+	public void setItemActive(boolean isActive) {
+		RPCHandler.rpcBroadcastPlayers(worldObj, this, "rpcSetItemActive", isActive);
+	}
+
+	@RPC(RPCSide.CLIENT)
+	private void rpcSetItemActive(boolean isActive) {
+		itemActive = isActive;
+		itemActiveStage = 0;
+		lastUpdateTime = new Date().getTime();
+	}
+
+	@Override
+	public ItemStack getItemInUse() {
+		return itemInUse;
+	}
+
+	@Override
+	public RedstoneBoardRobot getBoard() {
+		return board;
+	}
+
+	@Override
+	public DockingStation getLinkedStation() {
+		return linkedDockingStation;
+	}
+
+	@SideOnly(Side.CLIENT)
+	@Override
+	public boolean isInRangeToRenderDist(double par1) {
+		return true;
+    }
+
+	@Override
+	public double getEnergy() {
+		return mjStored;
+	}
+
+	@Override
+	public void setEnergy(double energy) {
+		mjStored = energy;
+
+		if (mjStored > MAX_ENERGY) {
+			mjStored = MAX_ENERGY;
+		}
+	}
+
+	@Override
+	protected boolean canDespawn() {
+		return false;
+	}
+
+	public AIRobot getOverridingAI() {
+		return mainAI.getOverridingAI();
+	}
+
+	public void overrideAI(AIRobot ai) {
+		mainAI.setOverridingAI(ai);
+	}
+
 }

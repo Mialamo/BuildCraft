@@ -52,18 +52,21 @@ import net.minecraftforge.common.IPlantable;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
+import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fluids.BlockFluidBase;
 import net.minecraftforge.oredict.OreDictionary;
 
 import buildcraft.api.blueprints.SchematicRegistry;
+import buildcraft.api.boards.RedstoneBoardRobot;
 import buildcraft.api.core.BCLog;
+import buildcraft.api.core.BlockIndex;
 import buildcraft.api.core.BuildCraftAPI;
 import buildcraft.api.core.IIconProvider;
 import buildcraft.api.core.JavaTools;
-import buildcraft.api.gates.ActionManager;
+import buildcraft.api.gates.StatementManager;
 import buildcraft.api.recipes.BuildcraftRecipeRegistry;
+import buildcraft.api.robots.DockingStationRegistry;
 import buildcraft.builders.urbanism.EntityRobotUrbanism;
-import buildcraft.core.BlockIndex;
 import buildcraft.core.BlockSpring;
 import buildcraft.core.BuildCraftConfiguration;
 import buildcraft.core.CommandBuildCraft;
@@ -71,6 +74,7 @@ import buildcraft.core.CoreIconProvider;
 import buildcraft.core.DefaultProps;
 import buildcraft.core.InterModComms;
 import buildcraft.core.ItemBuildCraft;
+import buildcraft.core.ItemMapLocation;
 import buildcraft.core.ItemSpring;
 import buildcraft.core.ItemWrench;
 import buildcraft.core.SpringPopulate;
@@ -89,11 +93,11 @@ import buildcraft.core.robots.EntityRobot;
 import buildcraft.core.triggers.ActionMachineControl;
 import buildcraft.core.triggers.ActionMachineControl.Mode;
 import buildcraft.core.triggers.ActionRedstoneOutput;
-import buildcraft.core.triggers.ActionTriggerIconProvider;
 import buildcraft.core.triggers.BCAction;
 import buildcraft.core.triggers.BCTrigger;
 import buildcraft.core.triggers.DefaultActionProvider;
 import buildcraft.core.triggers.DefaultTriggerProvider;
+import buildcraft.core.triggers.StatementIconProvider;
 import buildcraft.core.triggers.TriggerFluidContainer;
 import buildcraft.core.triggers.TriggerFluidContainerLevel;
 import buildcraft.core.triggers.TriggerInventory;
@@ -101,8 +105,11 @@ import buildcraft.core.triggers.TriggerInventoryLevel;
 import buildcraft.core.triggers.TriggerMachine;
 import buildcraft.core.triggers.TriggerRedstoneInput;
 import buildcraft.core.utils.CraftingHandler;
+import buildcraft.core.utils.WorldPropertyIsLeave;
+import buildcraft.core.utils.WorldPropertyIsSoft;
+import buildcraft.core.utils.WorldPropertyIsWood;
 
-@Mod(name = "BuildCraft", version = Version.VERSION, useMetadata = false, modid = "BuildCraft|Core", acceptedMinecraftVersions = "[1.7.2,1.8)", dependencies = "required-after:Forge@[10.12.1.1079,)")
+@Mod(name = "BuildCraft", version = Version.VERSION, useMetadata = false, modid = "BuildCraft|Core", acceptedMinecraftVersions = "[1.7.2,1.8)", dependencies = "required-after:Forge@[10.12.2.1121,)")
 public class BuildCraftCore extends BuildCraftMod {
 	public static final boolean NONRELEASED_BLOCKS = true;
 
@@ -130,6 +137,7 @@ public class BuildCraftCore extends BuildCraftMod {
 	public static Item goldGearItem;
 	public static Item diamondGearItem;
 	public static Item wrenchItem;
+	public static Item mapLocationItem;
 	@SideOnly(Side.CLIENT)
 	public static IIcon redLaserTexture;
 	@SideOnly(Side.CLIENT)
@@ -250,6 +258,9 @@ public class BuildCraftCore extends BuildCraftMod {
 			wrenchItem = (new ItemWrench()).setUnlocalizedName("wrenchItem");
 			CoreProxy.proxy.registerItem(wrenchItem);
 
+			mapLocationItem = (new ItemMapLocation()).setUnlocalizedName("mapLocation");
+			CoreProxy.proxy.registerItem(mapLocationItem);
+
 			Property modifyWorldProp = BuildCraftCore.mainConfiguration.get(Configuration.CATEGORY_GENERAL, "modifyWorld", true);
 			modifyWorldProp.comment = "set to false if BuildCraft should not generate custom blocks (e.g. oil)";
 			modifyWorld = modifyWorldProp.getBoolean(true);
@@ -301,8 +312,8 @@ public class BuildCraftCore extends BuildCraftMod {
 		channels = NetworkRegistry.INSTANCE.newChannel
 				(DefaultProps.NET_CHANNEL_NAME + "-CORE", new BuildCraftChannelHandler(), new PacketHandler());
 
-		ActionManager.registerTriggerProvider(new DefaultTriggerProvider());
-		ActionManager.registerActionProvider(new DefaultActionProvider());
+		StatementManager.registerTriggerProvider(new DefaultTriggerProvider());
+		StatementManager.registerActionProvider(new DefaultActionProvider());
 
 		if (BuildCraftCore.modifyWorld) {
 			MinecraftForge.EVENT_BUS.register(new SpringPopulate());
@@ -348,6 +359,10 @@ public class BuildCraftCore extends BuildCraftMod {
 		BuildCraftAPI.softBlocks.add(Blocks.air);
 
 		FMLCommonHandler.instance().bus().register(new TickHandlerCoreClient());
+
+		BuildCraftAPI.isSoftProperty = new WorldPropertyIsSoft();
+		BuildCraftAPI.isWoodProperty = new WorldPropertyIsWood();
+		BuildCraftAPI.isLeavesProperty = new WorldPropertyIsLeave();
 	}
 
 	@Mod.EventHandler
@@ -361,7 +376,7 @@ public class BuildCraftCore extends BuildCraftMod {
 		if (event.map.getTextureType() == 1) {
 			iconProvider = new CoreIconProvider();
 			iconProvider.registerIcons(event.map);
-			ActionTriggerIconProvider.INSTANCE.registerIcons(event.map);
+			StatementIconProvider.INSTANCE.registerIcons(event.map);
 		} else if (event.map.getTextureType() == 0) {
 			BuildCraftCore.redLaserTexture = event.map.registerIcon("buildcraft:blockRedLaser");
 			BuildCraftCore.blueLaserTexture = event.map.registerIcon("buildcraft:blockBlueLaser");
@@ -379,6 +394,7 @@ public class BuildCraftCore extends BuildCraftMod {
 		CoreProxy.proxy.addCraftingRecipe(new ItemStack(ironGearItem), " I ", "IGI", " I ", 'I', Items.iron_ingot, 'G', stoneGearItem);
 		CoreProxy.proxy.addCraftingRecipe(new ItemStack(goldGearItem), " I ", "IGI", " I ", 'I', Items.gold_ingot, 'G', ironGearItem);
 		CoreProxy.proxy.addCraftingRecipe(new ItemStack(diamondGearItem), " I ", "IGI", " I ", 'I', Items.diamond, 'G', goldGearItem);
+		CoreProxy.proxy.addCraftingRecipe(new ItemStack(mapLocationItem), "ppp", "pYp", "ppp", 'p', Items.paper, 'Y', new ItemStack(Items.dye, 1, 11));
 	}
 
 	@Mod.EventHandler
@@ -442,6 +458,15 @@ public class BuildCraftCore extends BuildCraftMod {
 		diffX = pos.get(0);
 		diffY = pos.get(1);
 		diffZ = pos.get(2);
+	}
+
+	@SubscribeEvent
+	public void cleanRegistries(WorldEvent.Unload unload) {
+		DockingStationRegistry.clear();
+		BuildCraftAPI.isSoftProperty.clear();
+		BuildCraftAPI.isWoodProperty.clear();
+		BuildCraftAPI.isLeavesProperty.clear();
+		RedstoneBoardRobot.reservedBlocks.clear();
 	}
 
 	@Mod.EventHandler

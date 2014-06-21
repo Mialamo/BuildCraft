@@ -10,13 +10,13 @@ package buildcraft.core;
 
 import java.util.List;
 
+import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
 
-import buildcraft.api.boards.IRedstoneBoardRobot;
 import buildcraft.api.boards.RedstoneBoardNBT;
 import buildcraft.api.boards.RedstoneBoardRegistry;
 import buildcraft.api.boards.RedstoneBoardRobotNBT;
@@ -31,19 +31,10 @@ public class ItemRobot extends ItemBuildCraft {
 
 	public EntityRobot createRobot(ItemStack stack, World world) {
 		try {
-			IRedstoneBoardRobot board = null;
 			NBTTagCompound nbt = NBTUtils.getItemData(stack);
 
-			if (nbt.hasKey("board")) {
-				NBTTagCompound boardCpt = nbt.getCompoundTag("board");
-				RedstoneBoardNBT boardNBT = RedstoneBoardRegistry.instance.getRedstoneBoard(boardCpt);
-
-				if (boardNBT instanceof RedstoneBoardRobotNBT) {
-					board = ((RedstoneBoardRobotNBT) boardNBT).create(boardCpt);
-				}
-			}
-
-			EntityRobot robot = new EntityRobot(world, board);
+			NBTTagCompound boardCpt = nbt.getCompoundTag("board");
+			EntityRobot robot = new EntityRobot(world, boardCpt);
 
 			return robot;
 		} catch (Throwable e) {
@@ -59,7 +50,7 @@ public class ItemRobot extends ItemBuildCraft {
 			return EntityRobot.ROBOT_BASE;
 		} else {
 			NBTTagCompound board = nbt.getCompoundTag("board");
-			RedstoneBoardNBT boardNBT = RedstoneBoardRegistry.instance.getRedstoneBoard(board);
+			RedstoneBoardNBT<?> boardNBT = RedstoneBoardRegistry.instance.getRedstoneBoard(board);
 
 			if (boardNBT instanceof RedstoneBoardRobotNBT) {
 				return ((RedstoneBoardRobotNBT) boardNBT).getRobotTexture();
@@ -76,7 +67,10 @@ public class ItemRobot extends ItemBuildCraft {
 		if (cpt.hasKey("id") && !"<unknown>".equals(cpt.getString("id"))) {
 			RedstoneBoardRegistry.instance.getRedstoneBoard(cpt).addInformation(stack, player, list, advanced);
 		}
-
 	}
 
+	@Override
+	public void registerIcons(IIconRegister par1IconRegister) {
+		// cancels default BC icon registering
+	}
 }

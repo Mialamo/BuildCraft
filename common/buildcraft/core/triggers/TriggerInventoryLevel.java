@@ -17,14 +17,13 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import buildcraft.api.core.IInvSlot;
-import buildcraft.api.gates.ITileTrigger;
 import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.ITriggerParameter;
 import buildcraft.core.inventory.InventoryIterator;
 import buildcraft.core.inventory.StackHelper;
 import buildcraft.core.utils.StringUtils;
 
-public class TriggerInventoryLevel extends BCTrigger implements ITileTrigger {
+public class TriggerInventoryLevel extends BCTrigger {
 
 	public enum TriggerType {
 
@@ -45,13 +44,13 @@ public class TriggerInventoryLevel extends BCTrigger implements ITileTrigger {
 	}
 
 	@Override
-	public boolean hasParameter() {
-		return true;
+	public int maxParameters() {
+		return 1;
 	}
 
 	@Override
-	public boolean requiresParameter() {
-		return true;
+	public int minParameters() {
+		return 1;
 	}
 
 	@Override
@@ -67,7 +66,7 @@ public class TriggerInventoryLevel extends BCTrigger implements ITileTrigger {
 		}
 
 		if (tile instanceof IInventory) {
-			ItemStack searchStack = parameter.getItemStack();
+			ItemStack searchStack = parameter.getItemStackToDraw();
 
 			int stackSpace = 0;
 			int foundItems = 0;
@@ -95,11 +94,11 @@ public class TriggerInventoryLevel extends BCTrigger implements ITileTrigger {
 	public int getIconIndex() {
 		switch (type) {
 			case BELOW_25:
-				return ActionTriggerIconProvider.Trigger_Inventory_Below25;
+				return StatementIconProvider.Trigger_Inventory_Below25;
 			case BELOW_50:
-				return ActionTriggerIconProvider.Trigger_Inventory_Below50;
+				return StatementIconProvider.Trigger_Inventory_Below50;
 			default:
-				return ActionTriggerIconProvider.Trigger_Inventory_Below75;
+				return StatementIconProvider.Trigger_Inventory_Below75;
 		}
 	}
 

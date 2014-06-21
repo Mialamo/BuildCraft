@@ -26,8 +26,8 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTankInfo;
 import net.minecraftforge.fluids.IFluidHandler;
 
+import buildcraft.api.core.BlockIndex;
 import buildcraft.api.core.BuildCraftAPI;
-import buildcraft.core.BlockIndex;
 import buildcraft.core.TileBuildCraft;
 import buildcraft.core.fluids.FluidUtils;
 import buildcraft.core.fluids.Tank;
@@ -214,7 +214,7 @@ public class TileFloodGate extends TileBuildCraft implements IFluidHandler {
 	}
 
 	private boolean canPlaceFluidAt(Block block, int x, int y, int z) {
-		return BuildCraftAPI.isSoftBlock(block, worldObj, x, y, z) && !BlockUtil.isFullFluidBlock(block, worldObj, x, y, z);
+		return BuildCraftAPI.isSoftBlock(worldObj, x, y, z) && !BlockUtil.isFullFluidBlock(block, worldObj, x, y, z);
 	}
 
 	public void onNeighborBlockChange(Block block) {

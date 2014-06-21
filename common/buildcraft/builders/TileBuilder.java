@@ -31,10 +31,10 @@ import net.minecraftforge.fluids.IFluidHandler;
 import buildcraft.BuildCraftBuilders;
 import buildcraft.api.blueprints.BuildingPermission;
 import buildcraft.api.blueprints.Translation;
+import buildcraft.api.core.BlockIndex;
 import buildcraft.api.core.NetworkData;
 import buildcraft.api.core.Position;
 import buildcraft.api.gates.IAction;
-import buildcraft.core.BlockIndex;
 import buildcraft.core.Box;
 import buildcraft.core.Box.Kind;
 import buildcraft.core.IMachine;
@@ -447,7 +447,7 @@ public class TileBuilder extends TileAbstractBuilder implements IMachine, IFluid
 
 		if (!worldObj.isRemote) {
 			if (i == 0) {
-				RPCHandler.rpcBroadcastPlayers(this, "setItemRequirements",
+				RPCHandler.rpcBroadcastPlayers(worldObj, this, "setItemRequirements",
 						null, null);
 				iterateBpt(false);
 			}
@@ -726,10 +726,10 @@ public class TileBuilder extends TileAbstractBuilder implements IMachine, IFluid
 				stack.stackSize = 0;
 			}
 
-			RPCHandler.rpcBroadcastPlayers(this, "setItemRequirements",
+			RPCHandler.rpcBroadcastPlayers(worldObj, this, "setItemRequirements",
 					((BptBuilderBlueprint) bluePrintBuilder).neededItems, realSize);
 		} else {
-			RPCHandler.rpcBroadcastPlayers(this, "setItemRequirements", null, null);
+			RPCHandler.rpcBroadcastPlayers(worldObj, this, "setItemRequirements", null, null);
 		}
 
 	}

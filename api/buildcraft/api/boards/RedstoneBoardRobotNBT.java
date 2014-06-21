@@ -11,10 +11,12 @@ package buildcraft.api.boards;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 
-public abstract class RedstoneBoardRobotNBT extends RedstoneBoardNBT {
+import buildcraft.api.robots.EntityRobotBase;
+
+public abstract class RedstoneBoardRobotNBT extends RedstoneBoardNBT<EntityRobotBase> {
 
 	@Override
-	public abstract IRedstoneBoardRobot create(NBTTagCompound nbt);
+	public abstract RedstoneBoardRobot create(NBTTagCompound nbt, EntityRobotBase robot);
 
 	public abstract ResourceLocation getRobotTexture();
 

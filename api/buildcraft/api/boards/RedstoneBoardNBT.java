@@ -23,13 +23,15 @@ import cpw.mods.fml.relauncher.SideOnly;
 
 import net.minecraftforge.common.util.Constants;
 
-public abstract class RedstoneBoardNBT {
+public abstract class RedstoneBoardNBT<T> {
+
+	private static Random rand = new Random();
 
 	public abstract String getID();
 
-	public abstract void addInformation(ItemStack stack, EntityPlayer player, List list, boolean advanced);
+	public abstract void addInformation(ItemStack stack, EntityPlayer player, List<?> list, boolean advanced);
 
-	public abstract IRedstoneBoard create(NBTTagCompound nbt);
+	public abstract IRedstoneBoard<T> create(NBTTagCompound nbt, T object);
 
 	@SideOnly(Side.CLIENT)
 	public abstract void registerIcons(IIconRegister iconRegister);
@@ -37,7 +39,9 @@ public abstract class RedstoneBoardNBT {
 	@SideOnly(Side.CLIENT)
 	public abstract IIcon getIcon(NBTTagCompound nbt);
 
-	public abstract void createRandomBoard(NBTTagCompound nbt, Random rand);
+	public abstract void createRandomBoard(NBTTagCompound nbt);
+
+	public abstract void createDefaultBoard(NBTTagCompound nbt);
 
 	public IBoardParameter[] getParameters(NBTTagCompound nbt) {
 		NBTTagList paramsNBT = nbt.getTagList("parameters", Constants.NBT.TAG_COMPOUND);
@@ -74,4 +78,7 @@ public abstract class RedstoneBoardNBT {
 		}
 	}
 
+	public float nextFloat(int difficulty) {
+		return 1F - (float) Math.pow(rand.nextFloat(), 1F / difficulty);
+	}
 }

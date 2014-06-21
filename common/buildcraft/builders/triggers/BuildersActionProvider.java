@@ -8,6 +8,7 @@
  */
 package buildcraft.builders.triggers;
 
+import java.util.Collection;
 import java.util.LinkedList;
 
 import net.minecraft.block.Block;
@@ -16,12 +17,18 @@ import net.minecraft.tileentity.TileEntity;
 import buildcraft.api.filler.FillerManager;
 import buildcraft.api.gates.IAction;
 import buildcraft.api.gates.IActionProvider;
+import buildcraft.api.transport.IPipeTile;
 import buildcraft.builders.TileFiller;
 
 public class BuildersActionProvider implements IActionProvider {
 
 	@Override
-	public LinkedList<IAction> getNeighborActions(Block block, TileEntity tile) {
+	public Collection<IAction> getPipeActions(IPipeTile pipe) {
+		return null;
+	}
+
+	@Override
+	public Collection<IAction> getNeighborActions(Block block, TileEntity tile) {
 		LinkedList<IAction> actions = new LinkedList<IAction>();
 		if (tile instanceof TileFiller) {
 			actions.addAll(FillerManager.registry.getActions());
