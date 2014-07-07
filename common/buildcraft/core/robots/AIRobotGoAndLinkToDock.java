@@ -15,6 +15,10 @@ public class AIRobotGoAndLinkToDock extends AIRobot {
 
 	public DockingStation station;
 
+	public AIRobotGoAndLinkToDock(EntityRobotBase iRobot) {
+		super(iRobot);
+	}
+
 	public AIRobotGoAndLinkToDock(EntityRobotBase iRobot, DockingStation iStation) {
 		super(iRobot);
 
@@ -27,7 +31,7 @@ public class AIRobotGoAndLinkToDock extends AIRobot {
 			terminate();
 		} else {
 			if (robot.linkToStation(station)) {
-				startDelegateAI(new AIRobotMoveToBlock(robot,
+				startDelegateAI(new AIRobotGotoBlock(robot,
 						station.pipe.xCoord + station.side.offsetX * 2,
 						station.pipe.yCoord + station.side.offsetY * 2,
 						station.pipe.zCoord + station.side.offsetZ * 2));
@@ -39,7 +43,7 @@ public class AIRobotGoAndLinkToDock extends AIRobot {
 
 	@Override
 	public void delegateAIEnded(AIRobot ai) {
-		if (ai instanceof AIRobotMoveToBlock) {
+		if (ai instanceof AIRobotGotoBlock) {
 			startDelegateAI(new AIRobotStraightMoveTo(robot,
 					station.pipe.xCoord + 0.5F + station.side.offsetX * 0.5F,
 					station.pipe.yCoord + 0.5F + station.side.offsetY * 0.5F,

@@ -11,7 +11,6 @@ package buildcraft.transport.triggers;
 import java.util.Locale;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
-import net.minecraft.util.IIcon;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -22,7 +21,6 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTankInfo;
 
 import buildcraft.api.gates.IGate;
-import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.ITriggerParameter;
 import buildcraft.core.triggers.BCTrigger;
 import buildcraft.core.utils.StringUtils;
@@ -31,8 +29,6 @@ import buildcraft.transport.PipeTransportFluids;
 import buildcraft.transport.PipeTransportItems;
 import buildcraft.transport.PipeTransportPower;
 import buildcraft.transport.TravelingItem;
-import buildcraft.transport.pipes.PipePowerWood;
-
 
 public class TriggerPipeContents extends BCTrigger {
 
@@ -46,7 +42,6 @@ public class TriggerPipeContents extends BCTrigger {
 		public BCTrigger trigger;
 	};
 	private PipeContents kind;
-	private IIcon icon;
 
 	public TriggerPipeContents(PipeContents kind) {
 		super("buildcraft:pipe.contents." + kind.name().toLowerCase(Locale.ENGLISH), "buildcraft.pipe.contents." + kind.name());
@@ -141,8 +136,7 @@ public class TriggerPipeContents extends BCTrigger {
 
 					return false;
 				case requestsEnergy:
-					PipePowerWood wood = (PipePowerWood) pipe;
-					return wood.requestsPower();
+					return transportPower.isQueryingPower();
 				default:
 				case tooMuchEnergy:
 					return transportPower.isOverloaded();
@@ -153,18 +147,8 @@ public class TriggerPipeContents extends BCTrigger {
 	}
 
 	@Override
-	public IIcon getIcon() {
-		return icon;
-	}
-
-	@Override
 	@SideOnly(Side.CLIENT)
 	public void registerIcons(IIconRegister iconRegister) {
 		icon = iconRegister.registerIcon("buildcraft:triggers/trigger_pipecontents_" + kind.name().toLowerCase(Locale.ENGLISH));
-	}
-
-	@Override
-	public ITrigger rotateLeft() {
-		return this;
 	}
 }

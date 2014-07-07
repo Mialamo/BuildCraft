@@ -19,6 +19,10 @@ import buildcraft.api.robots.EntityRobotBase;
 
 public class BoardRobotLumberjack extends BoardRobotGenericBreakBlock {
 
+	public BoardRobotLumberjack(EntityRobotBase iRobot) {
+		super(iRobot);
+	}
+
 	public BoardRobotLumberjack(EntityRobotBase iRobot, NBTTagCompound nbt) {
 		super(iRobot);
 	}
@@ -30,7 +34,7 @@ public class BoardRobotLumberjack extends BoardRobotGenericBreakBlock {
 
 	@Override
 	public boolean isExpectedTool(ItemStack stack) {
-		return stack.getItem() instanceof ItemAxe;
+		return stack != null && stack.getItem() instanceof ItemAxe;
 	}
 
 	@Override

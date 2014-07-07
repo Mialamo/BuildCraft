@@ -420,10 +420,13 @@ public class PipeTransportPower extends PipeTransport {
 	public void requestEnergy(ForgeDirection from, double amount) {
 		step();
 
-		if (this.container.pipe instanceof IPipeTransportPowerHook) {
-			nextPowerQuery[from.ordinal()] += ((IPipeTransportPowerHook) this.container.pipe).requestEnergy(from, amount);
-		} else {
-			nextPowerQuery[from.ordinal()] += amount;
+		if (!container.pipe.isClosed()) {
+			if (this.container.pipe instanceof IPipeTransportPowerHook) {
+				nextPowerQuery[from.ordinal()] += ((IPipeTransportPowerHook) this.container.pipe).requestEnergy(from,
+						amount);
+			} else {
+				nextPowerQuery[from.ordinal()] += amount;
+			}
 		}
 	}
 
@@ -530,6 +533,16 @@ public class PipeTransportPower extends PipeTransport {
 		}
 
 		return result;
+	}
+
+	public boolean isQueryingPower() {
+		for (double d : powerQuery) {
+			if (d > 1e-4) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	static {

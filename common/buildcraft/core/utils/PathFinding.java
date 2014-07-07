@@ -17,6 +17,8 @@ import net.minecraft.world.World;
 
 import buildcraft.api.core.BlockIndex;
 import buildcraft.api.core.BuildCraftAPI;
+import buildcraft.api.core.IBox;
+import buildcraft.core.robots.IBlockFilter;
 
 /**
  * This class implements a 3D path finding based on the A* algorithm, following
@@ -30,7 +32,12 @@ public class PathFinding {
 	private World world;
 	private BlockIndex start;
 	private BlockIndex end;
-	private IPathFound pathFound;
+	private BlockIndex boxEnd;
+	private IBlockFilter pathFound;
+	private float maxDistance = -1;
+	private float sqrMaxDistance = -1;
+	private IBox box;
+	private BlockIndex boxCenter;
 
 	private HashMap<BlockIndex, Node> openList = new HashMap<BlockIndex, PathFinding.Node>();
 	private HashMap<BlockIndex, Node> closedList = new HashMap<BlockIndex, PathFinding.Node>();
@@ -56,7 +63,7 @@ public class PathFinding {
 		nextIteration = startNode;
 	}
 
-	public PathFinding(World iWorld, BlockIndex iStart, IPathFound iPathFound) {
+	public PathFinding(World iWorld, BlockIndex iStart, IBlockFilter iPathFound, float iMaxDistance, IBox iBox) {
 		world = iWorld;
 		start = iStart;
 		pathFound = iPathFound;
@@ -69,6 +76,16 @@ public class PathFinding {
 		startNode.index = iStart;
 		openList.put(start, startNode);
 		nextIteration = startNode;
+		maxDistance = iMaxDistance;
+		sqrMaxDistance = maxDistance * maxDistance;
+		box = iBox;
+
+		if (box != null) {
+			boxCenter = new BlockIndex();
+			boxCenter.x = (int) (box.pMin().x + (box.pMax().x - box.pMin().x) / 2);
+			boxCenter.y = (int) (box.pMin().y + (box.pMax().y - box.pMin().y) / 2);
+			boxCenter.z = (int) (box.pMin().z + (box.pMax().z - box.pMin().z) / 2);
+		}
 	}
 
 	public void iterate() {
@@ -76,11 +93,11 @@ public class PathFinding {
 	}
 
 	public void iterate(int itNumber) {
-		if (nextIteration == null) {
-			return;
-		}
-
 		for (int i = 0; i < itNumber; ++i) {
+			if (nextIteration == null) {
+				return;
+			}
+
 			if (endReached) {
 				result = new LinkedList<BlockIndex>();
 
@@ -139,6 +156,12 @@ public class PathFinding {
 
 					if (end != null) {
 						nextNode.destinationCost = distance(nextNode.index, end);
+					} else if (box != null) {
+						if (box.contains(x, y, z)) {
+							nextNode.destinationCost = 0;
+						} else {
+							nextNode.destinationCost = distance(nextNode.index, boxCenter);
+						}
 					} else {
 						nextNode.destinationCost = 0;
 					}
@@ -200,8 +223,10 @@ public class PathFinding {
 	}
 
 	private boolean endReached(int x, int y, int z) {
-		if (pathFound != null) {
-			return pathFound.endReached(world, x, y, z);
+		if (box != null && !box.contains(x, y, z)) {
+			return false;
+		} else if (pathFound != null) {
+			return pathFound.matches(world, x, y, z);
 		} else {
 			return end.x == x && end.y == y && end.z == z;
 		}
@@ -336,6 +361,28 @@ public class PathFinding {
 		if (resultMoves[1][2][2] == 0) {
 			resultMoves[0][2][2] = 0;
 			resultMoves[2][2][2] = 0;
+		}
+
+
+		if (maxDistance != -1) {
+			for (int dx = -1; dx <= +1; ++dx) {
+				for (int dy = -1; dy <= +1; ++dy) {
+					for (int dz = -1; dz <= +1; ++dz) {
+						int x = from.index.x + dx;
+						int y = from.index.y + dy;
+						int z = from.index.z + dz;
+
+						float distX = x - start.x;
+						float distY = y - start.y;
+						float distZ = z - start.z;
+						float sqrDist = distX * distX + distY * distY + distZ * distZ;
+
+						if (sqrDist > sqrMaxDistance) {
+							resultMoves[dx + 1][dy + 1][dz + 1] = 0;
+						}
+					}
+				}
+			}
 		}
 
 		return resultMoves;

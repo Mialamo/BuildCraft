@@ -33,6 +33,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import buildcraft.BuildCraftTransport;
 import buildcraft.api.core.IIconProvider;
+import buildcraft.api.gates.ActionState;
 import buildcraft.api.gates.IAction;
 import buildcraft.api.gates.ITrigger;
 import buildcraft.api.transport.IPipe;
@@ -42,6 +43,7 @@ import buildcraft.core.IDropControlInventory;
 import buildcraft.core.inventory.InvUtils;
 import buildcraft.core.network.TilePacketWrapper;
 import buildcraft.core.utils.Utils;
+import buildcraft.transport.gates.ActionSlot;
 import buildcraft.transport.gates.GateFactory;
 import buildcraft.transport.pipes.events.PipeEvent;
 
@@ -60,6 +62,9 @@ public abstract class Pipe<T extends PipeTransport> implements IDropControlInven
 
 	private boolean internalUpdateScheduled = false;
 	private boolean initialized = false;
+	private boolean closed = false;
+
+	private ArrayList<ActionState> actionStates = new ArrayList<ActionState>();
 
 	public Pipe(T transport, Item item) {
 		this.transport = transport;
@@ -206,6 +211,9 @@ public abstract class Pipe<T extends PipeTransport> implements IDropControlInven
 			internalUpdate();
 			internalUpdateScheduled = false;
 		}
+
+		closed = false;
+		actionStates.clear();
 
 		// Update the gate if we have any
 		for (Gate gate : gates) {
@@ -527,11 +535,7 @@ public abstract class Pipe<T extends PipeTransport> implements IDropControlInven
 	public LinkedList<IAction> getActions() {
 		LinkedList<IAction> result = new LinkedList<IAction>();
 
-		for (Gate gate : gates) {
-			if (gate != null) {
-				gate.addActions(result);
-			}
-		}
+		result.add(BuildCraftTransport.actionPipeClose);
 
 		return result;
 	}
@@ -549,7 +553,7 @@ public abstract class Pipe<T extends PipeTransport> implements IDropControlInven
 		container.scheduleRenderUpdate();
 	}
 
-	protected void actionsActivated(Collection<IAction> actions) {
+	protected void actionsActivated(Collection<ActionSlot> actions) {
 	}
 
 	public TileGenericPipe getContainer() {
@@ -656,5 +660,21 @@ public abstract class Pipe<T extends PipeTransport> implements IDropControlInven
 	@Override
 	public TileEntity getAdjacentTile(ForgeDirection dir) {
 		return container.getTile(dir);
+	}
+
+	public void close() {
+		closed = true;
+	}
+
+	public boolean isClosed() {
+		return closed;
+	}
+
+	private void pushActionState(ActionState state) {
+		actionStates.add(state);
+	}
+
+	private Collection<ActionState> getActionStates() {
+		return actionStates;
 	}
 }

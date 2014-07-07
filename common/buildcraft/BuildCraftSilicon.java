@@ -27,6 +27,8 @@ import net.minecraftforge.oredict.OreDictionary;
 import buildcraft.api.blueprints.SchematicRegistry;
 import buildcraft.api.boards.RedstoneBoardRegistry;
 import buildcraft.api.gates.ActionParameterItemStack;
+import buildcraft.api.gates.IAction;
+import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.StatementManager;
 import buildcraft.api.gates.TriggerParameterItemStack;
 import buildcraft.api.recipes.BuildcraftRecipeRegistry;
@@ -40,11 +42,19 @@ import buildcraft.core.Version;
 import buildcraft.core.network.BuildCraftChannelHandler;
 import buildcraft.core.proxy.CoreProxy;
 import buildcraft.core.robots.RobotIntegrationRecipe;
+import buildcraft.core.robots.boards.BoardRobotBomberNBT;
+import buildcraft.core.robots.boards.BoardRobotBuilderNBT;
+import buildcraft.core.robots.boards.BoardRobotButcherNBT;
+import buildcraft.core.robots.boards.BoardRobotCarrierNBT;
+import buildcraft.core.robots.boards.BoardRobotFarmerNBT;
+import buildcraft.core.robots.boards.BoardRobotHarvesterNBT;
+import buildcraft.core.robots.boards.BoardRobotKnightNBT;
 import buildcraft.core.robots.boards.BoardRobotLeaveCutterNBT;
 import buildcraft.core.robots.boards.BoardRobotLumberjackNBT;
+import buildcraft.core.robots.boards.BoardRobotMinerNBT;
 import buildcraft.core.robots.boards.BoardRobotPickerNBT;
 import buildcraft.core.robots.boards.BoardRobotPlanterNBT;
-import buildcraft.core.triggers.BCAction;
+import buildcraft.core.robots.boards.BoardRobotShovelmanNBT;
 import buildcraft.silicon.BlockLaser;
 import buildcraft.silicon.BlockLaserTable;
 import buildcraft.silicon.GuiHandler;
@@ -63,8 +73,17 @@ import buildcraft.silicon.network.PacketHandlerSilicon;
 import buildcraft.silicon.recipes.AdvancedFacadeRecipe;
 import buildcraft.silicon.recipes.GateExpansionRecipe;
 import buildcraft.silicon.recipes.GateLogicSwapRecipe;
-import buildcraft.silicon.statements.ActionRobotGoToStation;
+import buildcraft.silicon.statements.ActionRobotFilter;
+import buildcraft.silicon.statements.ActionRobotGotoStation;
+import buildcraft.silicon.statements.ActionRobotWakeUp;
+import buildcraft.silicon.statements.ActionRobotWorkInArea;
+import buildcraft.silicon.statements.ActionStationForbidRobot;
+import buildcraft.silicon.statements.ActionStationProvideItems;
+import buildcraft.silicon.statements.ActionStationRequestItemsInv;
+import buildcraft.silicon.statements.ActionStationRequestItemsPipe;
 import buildcraft.silicon.statements.RobotsActionProvider;
+import buildcraft.silicon.statements.RobotsTriggerProvider;
+import buildcraft.silicon.statements.TriggerRobotSleep;
 import buildcraft.transport.gates.GateDefinition.GateLogic;
 import buildcraft.transport.gates.GateDefinition.GateMaterial;
 import buildcraft.transport.gates.GateExpansionPulsar;
@@ -87,7 +106,16 @@ public class BuildCraftSilicon extends BuildCraftMod {
 	public static Item redstoneCrystal;
 	public static Item robotItem;
 
-	public static BCAction actionRobotGotoStation = new ActionRobotGoToStation();
+	public static IAction actionRobotGotoStation = new ActionRobotGotoStation();
+	public static IAction actionRobotWakeUp = new ActionRobotWakeUp();
+	public static IAction actionRobotWorkInArea = new ActionRobotWorkInArea();
+	public static IAction actionRobotFilter = new ActionRobotFilter();
+	public static IAction actionStationRequestItems = new ActionStationRequestItemsInv();
+	public static IAction actionStationProvideItems = new ActionStationProvideItems();
+	public static IAction actionStationForbidRobot = new ActionStationForbidRobot();
+	public static IAction actionStationDropInPipe = new ActionStationRequestItemsPipe();
+
+	public static ITrigger triggerRobotSleep = new TriggerRobotSleep();
 
 	@Mod.EventHandler
 	public void preInit(FMLPreInitializationEvent evt) {
@@ -120,12 +148,22 @@ public class BuildCraftSilicon extends BuildCraftMod {
 
 		RedstoneBoardRegistry.instance = new ImplRedstoneBoardRegistry();
 
-		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotPickerNBT.instance, 10);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotPickerNBT.instance, 20);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotCarrierNBT.instance, 10);
 		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotLumberjackNBT.instance, 10);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotHarvesterNBT.instance, 10);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotMinerNBT.instance, 10);
 		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotPlanterNBT.instance, 5);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotFarmerNBT.instance, 5);
 		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotLeaveCutterNBT.instance, 5);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotButcherNBT.instance, 5);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotShovelmanNBT.instance, 5);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotKnightNBT.instance, 1);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotBomberNBT.instance, 1);
+		RedstoneBoardRegistry.instance.registerBoardClass(BoardRobotBuilderNBT.instance, 0.5F);
 
 		StatementManager.registerActionProvider(new RobotsActionProvider());
+		StatementManager.registerTriggerProvider(new RobotsTriggerProvider());
 	}
 
 	@Mod.EventHandler

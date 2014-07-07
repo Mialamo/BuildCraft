@@ -63,10 +63,11 @@ import buildcraft.api.core.BlockIndex;
 import buildcraft.api.core.BuildCraftAPI;
 import buildcraft.api.core.IIconProvider;
 import buildcraft.api.core.JavaTools;
+import buildcraft.api.gates.IAction;
+import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.StatementManager;
 import buildcraft.api.recipes.BuildcraftRecipeRegistry;
 import buildcraft.api.robots.DockingStationRegistry;
-import buildcraft.builders.urbanism.EntityRobotUrbanism;
 import buildcraft.core.BlockSpring;
 import buildcraft.core.BuildCraftConfiguration;
 import buildcraft.core.CommandBuildCraft;
@@ -82,6 +83,7 @@ import buildcraft.core.TickHandlerCoreClient;
 import buildcraft.core.Version;
 import buildcraft.core.network.BuildCraftChannelHandler;
 import buildcraft.core.network.EntityIds;
+import buildcraft.core.network.NetworkIdRegistry;
 import buildcraft.core.network.PacketHandler;
 import buildcraft.core.network.PacketUpdate;
 import buildcraft.core.proxy.CoreProxy;
@@ -93,11 +95,10 @@ import buildcraft.core.robots.EntityRobot;
 import buildcraft.core.triggers.ActionMachineControl;
 import buildcraft.core.triggers.ActionMachineControl.Mode;
 import buildcraft.core.triggers.ActionRedstoneOutput;
-import buildcraft.core.triggers.BCAction;
-import buildcraft.core.triggers.BCTrigger;
 import buildcraft.core.triggers.DefaultActionProvider;
 import buildcraft.core.triggers.DefaultTriggerProvider;
 import buildcraft.core.triggers.StatementIconProvider;
+import buildcraft.core.triggers.TriggerEnergy;
 import buildcraft.core.triggers.TriggerFluidContainer;
 import buildcraft.core.triggers.TriggerFluidContainerLevel;
 import buildcraft.core.triggers.TriggerInventory;
@@ -105,7 +106,12 @@ import buildcraft.core.triggers.TriggerInventoryLevel;
 import buildcraft.core.triggers.TriggerMachine;
 import buildcraft.core.triggers.TriggerRedstoneInput;
 import buildcraft.core.utils.CraftingHandler;
+import buildcraft.core.utils.WorldPropertyIsDirt;
+import buildcraft.core.utils.WorldPropertyIsFarmland;
+import buildcraft.core.utils.WorldPropertyIsHarvestable;
 import buildcraft.core.utils.WorldPropertyIsLeave;
+import buildcraft.core.utils.WorldPropertyIsOre;
+import buildcraft.core.utils.WorldPropertyIsShoveled;
 import buildcraft.core.utils.WorldPropertyIsSoft;
 import buildcraft.core.utils.WorldPropertyIsWood;
 
@@ -151,28 +157,30 @@ public class BuildCraftCore extends BuildCraftMod {
 	public static int blockByEntityModel;
 	public static int legacyPipeModel;
 	public static int markerModel;
-	public static BCTrigger triggerMachineActive = new TriggerMachine(true);
-	public static BCTrigger triggerMachineInactive = new TriggerMachine(false);
-	public static BCTrigger triggerEmptyInventory = new TriggerInventory(TriggerInventory.State.Empty);
-	public static BCTrigger triggerContainsInventory = new TriggerInventory(TriggerInventory.State.Contains);
-	public static BCTrigger triggerSpaceInventory = new TriggerInventory(TriggerInventory.State.Space);
-	public static BCTrigger triggerFullInventory = new TriggerInventory(TriggerInventory.State.Full);
-	public static BCTrigger triggerEmptyFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Empty);
-	public static BCTrigger triggerContainsFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Contains);
-	public static BCTrigger triggerSpaceFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Space);
-	public static BCTrigger triggerFullFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Full);
-	public static BCTrigger triggerRedstoneActive = new TriggerRedstoneInput(true);
-	public static BCTrigger triggerRedstoneInactive = new TriggerRedstoneInput(false);
-	public static BCTrigger triggerInventoryBelow25 = new TriggerInventoryLevel(TriggerInventoryLevel.TriggerType.BELOW_25);
-	public static BCTrigger triggerInventoryBelow50 = new TriggerInventoryLevel(TriggerInventoryLevel.TriggerType.BELOW_50);
-	public static BCTrigger triggerInventoryBelow75 = new TriggerInventoryLevel(TriggerInventoryLevel.TriggerType.BELOW_75);
-	public static BCTrigger triggerFluidContainerBelow25 = new TriggerFluidContainerLevel(TriggerFluidContainerLevel.TriggerType.BELOW_25);
-	public static BCTrigger triggerFluidContainerBelow50 = new TriggerFluidContainerLevel(TriggerFluidContainerLevel.TriggerType.BELOW_50);
-	public static BCTrigger triggerFluidContainerBelow75 = new TriggerFluidContainerLevel(TriggerFluidContainerLevel.TriggerType.BELOW_75);
-	public static BCAction actionRedstone = new ActionRedstoneOutput();
-	public static BCAction actionOn = new ActionMachineControl(Mode.On);
-	public static BCAction actionOff = new ActionMachineControl(Mode.Off);
-	public static BCAction actionLoop = new ActionMachineControl(Mode.Loop);
+	public static ITrigger triggerMachineActive = new TriggerMachine(true);
+	public static ITrigger triggerMachineInactive = new TriggerMachine(false);
+	public static ITrigger triggerEnergyHigh = new TriggerEnergy(true);
+	public static ITrigger triggerEnergyLow = new TriggerEnergy(false);
+	public static ITrigger triggerEmptyInventory = new TriggerInventory(TriggerInventory.State.Empty);
+	public static ITrigger triggerContainsInventory = new TriggerInventory(TriggerInventory.State.Contains);
+	public static ITrigger triggerSpaceInventory = new TriggerInventory(TriggerInventory.State.Space);
+	public static ITrigger triggerFullInventory = new TriggerInventory(TriggerInventory.State.Full);
+	public static ITrigger triggerEmptyFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Empty);
+	public static ITrigger triggerContainsFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Contains);
+	public static ITrigger triggerSpaceFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Space);
+	public static ITrigger triggerFullFluid = new TriggerFluidContainer(TriggerFluidContainer.State.Full);
+	public static ITrigger triggerRedstoneActive = new TriggerRedstoneInput(true);
+	public static ITrigger triggerRedstoneInactive = new TriggerRedstoneInput(false);
+	public static ITrigger triggerInventoryBelow25 = new TriggerInventoryLevel(TriggerInventoryLevel.TriggerType.BELOW_25);
+	public static ITrigger triggerInventoryBelow50 = new TriggerInventoryLevel(TriggerInventoryLevel.TriggerType.BELOW_50);
+	public static ITrigger triggerInventoryBelow75 = new TriggerInventoryLevel(TriggerInventoryLevel.TriggerType.BELOW_75);
+	public static ITrigger triggerFluidContainerBelow25 = new TriggerFluidContainerLevel(TriggerFluidContainerLevel.TriggerType.BELOW_25);
+	public static ITrigger triggerFluidContainerBelow50 = new TriggerFluidContainerLevel(TriggerFluidContainerLevel.TriggerType.BELOW_50);
+	public static ITrigger triggerFluidContainerBelow75 = new TriggerFluidContainerLevel(TriggerFluidContainerLevel.TriggerType.BELOW_75);
+	public static IAction actionRedstone = new ActionRedstoneOutput();
+	public static IAction actionOn = new ActionMachineControl(Mode.On);
+	public static IAction actionOff = new ActionMachineControl(Mode.Off);
+	public static IAction actionLoop = new ActionMachineControl(Mode.Loop);
 	public static boolean loadDefaultRecipes = true;
 	public static boolean consumeWaterSources = false;
 	//public static BptItem[] itemBptProps = new BptItem[Item.itemsList.length];
@@ -312,6 +320,8 @@ public class BuildCraftCore extends BuildCraftMod {
 		channels = NetworkRegistry.INSTANCE.newChannel
 				(DefaultProps.NET_CHANNEL_NAME + "-CORE", new BuildCraftChannelHandler(), new PacketHandler());
 
+		NetworkIdRegistry.instance = new NetworkIdRegistry();
+
 		StatementManager.registerTriggerProvider(new DefaultTriggerProvider());
 		StatementManager.registerActionProvider(new DefaultActionProvider());
 
@@ -332,8 +342,6 @@ public class BuildCraftCore extends BuildCraftMod {
 			loadRecipes();
 		}
 		EntityRegistry.registerModEntity(EntityRobot.class, "bcRobot", EntityIds.ROBOT, instance, 50, 1, true);
-		EntityRegistry.registerModEntity(EntityRobotUrbanism.class, "bcRobotUrbanism", EntityIds.ROBOT_URBANISM, instance, 50, 1, true);
-		EntityList.stringToClassMapping.remove("BuildCraft|Core.bcRobot");
 		EntityList.stringToClassMapping.remove("BuildCraft|Core.bcLaser");
 		EntityList.stringToClassMapping.remove("BuildCraft|Core.bcEnergyLaser");
 
@@ -363,6 +371,12 @@ public class BuildCraftCore extends BuildCraftMod {
 		BuildCraftAPI.isSoftProperty = new WorldPropertyIsSoft();
 		BuildCraftAPI.isWoodProperty = new WorldPropertyIsWood();
 		BuildCraftAPI.isLeavesProperty = new WorldPropertyIsLeave();
+		BuildCraftAPI.isBasicOreProperty = new WorldPropertyIsOre(false);
+		BuildCraftAPI.isExtendedOreProperty = new WorldPropertyIsOre(true);
+		BuildCraftAPI.isHarvestableProperty = new WorldPropertyIsHarvestable();
+		BuildCraftAPI.isFarmlandProperty = new WorldPropertyIsFarmland();
+		BuildCraftAPI.isShoveled = new WorldPropertyIsShoveled();
+		BuildCraftAPI.isDirtProperty = new WorldPropertyIsDirt();
 	}
 
 	@Mod.EventHandler
@@ -466,6 +480,12 @@ public class BuildCraftCore extends BuildCraftMod {
 		BuildCraftAPI.isSoftProperty.clear();
 		BuildCraftAPI.isWoodProperty.clear();
 		BuildCraftAPI.isLeavesProperty.clear();
+		BuildCraftAPI.isBasicOreProperty.clear();
+		BuildCraftAPI.isExtendedOreProperty.clear();
+		BuildCraftAPI.isHarvestableProperty.clear();
+		BuildCraftAPI.isFarmlandProperty.clear();
+		BuildCraftAPI.isShoveled.clear();
+		BuildCraftAPI.isDirtProperty.clear();
 		RedstoneBoardRobot.reservedBlocks.clear();
 	}
 

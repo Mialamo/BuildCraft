@@ -10,11 +10,15 @@ package buildcraft.core.robots;
 
 import buildcraft.api.robots.EntityRobotBase;
 
-public class AIRobotStraightMoveTo extends AIRobotMove {
+public class AIRobotStraightMoveTo extends AIRobotGoto {
 
 	private double prevDistance = Double.MAX_VALUE;
 
 	private float x, y, z;
+
+	public AIRobotStraightMoveTo(EntityRobotBase iRobot) {
+		super(iRobot);
+	}
 
 	public AIRobotStraightMoveTo(EntityRobotBase iRobot, float ix, float iy, float iz) {
 		super(iRobot);

@@ -29,7 +29,7 @@ public class BoardRobotLeaveCutter extends BoardRobotGenericBreakBlock {
 
 	@Override
 	public boolean isExpectedTool(ItemStack stack) {
-		return stack.getItem() instanceof ItemShears;
+		return stack != null && stack.getItem() instanceof ItemShears;
 	}
 
 	@Override

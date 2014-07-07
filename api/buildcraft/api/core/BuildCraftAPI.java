@@ -23,6 +23,12 @@ public final class BuildCraftAPI {
 	public static IWorldProperty isSoftProperty;
 	public static IWorldProperty isWoodProperty;
 	public static IWorldProperty isLeavesProperty;
+	public static IWorldProperty isBasicOreProperty;
+	public static IWorldProperty isExtendedOreProperty;
+	public static IWorldProperty isHarvestableProperty;
+	public static IWorldProperty isFarmlandProperty;
+	public static IWorldProperty isDirtProperty;
+	public static IWorldProperty isShoveled;
 
 	/**
 	 * Deactivate constructor

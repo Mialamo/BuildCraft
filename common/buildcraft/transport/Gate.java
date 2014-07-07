@@ -8,6 +8,7 @@
  */
 package buildcraft.transport;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -38,6 +39,7 @@ import buildcraft.api.transport.IPipe;
 import buildcraft.api.transport.PipeWire;
 import buildcraft.core.GuiIds;
 import buildcraft.core.triggers.ActionRedstoneOutput;
+import buildcraft.transport.gates.ActionSlot;
 import buildcraft.transport.gates.GateDefinition.GateLogic;
 import buildcraft.transport.gates.GateDefinition.GateMaterial;
 import buildcraft.transport.gates.ItemGate;
@@ -60,7 +62,8 @@ public final class Gate implements IGate {
 	public IAction[] actions = new IAction[MAX_STATEMENTS];
 	public IActionParameter[][] actionParameters = new IActionParameter[8][MAX_PARAMETERS];
 
-	public ActionState[] actionsState = new ActionState[MAX_STATEMENTS];
+	public ActionActiveState[] actionsState = new ActionActiveState[MAX_STATEMENTS];
+	public ArrayList<ActionSlot> activeActions = new ArrayList<ActionSlot>();
 
 	public BitSet broadcastSignal = new BitSet(PipeWire.VALUES.length);
 	public BitSet prevBroadcastSignal = new BitSet(PipeWire.VALUES.length);
@@ -83,7 +86,7 @@ public final class Gate implements IGate {
 		this.direction = direction;
 
 		for (int i = 0; i < actionsState.length; ++i) {
-			actionsState[i] = ActionState.Deactivated;
+			actionsState[i] = ActionActiveState.Deactivated;
 		}
 	}
 
@@ -149,7 +152,7 @@ public final class Gate implements IGate {
 		}
 		data.setTag("expansions", exList);
 
-		for (int i = 0; i < 8; ++i) {
+		for (int i = 0; i < MAX_STATEMENTS; ++i) {
 			if (triggers[i] != null) {
 				data.setString("trigger[" + i + "]", triggers[i].getUniqueTag());
 			}
@@ -158,7 +161,7 @@ public final class Gate implements IGate {
 				data.setString("action[" + i + "]", actions[i].getUniqueTag());
 			}
 
-			for (int j = 0; j < 3; ++j) {
+			for (int j = 0; j < MAX_PARAMETERS; ++j) {
 				if (triggerParameters[i][j] != null) {
 					NBTTagCompound cpt = new NBTTagCompound();
 					cpt.setString("kind", StatementManager.getParameterKind(triggerParameters[i][j]));
@@ -167,7 +170,7 @@ public final class Gate implements IGate {
 				}
 			}
 
-			for (int j = 0; j < 3; ++j) {
+			for (int j = 0; j < MAX_PARAMETERS; ++j) {
 				if (actionParameters[i][j] != null) {
 					NBTTagCompound cpt = new NBTTagCompound();
 					cpt.setString("kind", StatementManager.getParameterKind(actionParameters[i][j]));
@@ -185,7 +188,7 @@ public final class Gate implements IGate {
 	}
 
 	public void readFromNBT(NBTTagCompound data) {
-		for (int i = 0; i < 8; ++i) {
+		for (int i = 0; i < MAX_STATEMENTS; ++i) {
 			if (data.hasKey("trigger[" + i + "]")) {
 				triggers[i] = (ITrigger) StatementManager.statements.get(data.getString("trigger[" + i + "]"));
 			}
@@ -200,7 +203,7 @@ public final class Gate implements IGate {
 				triggerParameters[i][0].readFromNBT(data.getCompoundTag("triggerParameters[" + i + "]"));
 			}
 
-			for (int j = 0; j < 3; ++j) {
+			for (int j = 0; j < MAX_PARAMETERS; ++j) {
 				if (data.hasKey("triggerParameters[" + i + "][" + j + "]")) {
 					NBTTagCompound cpt = data.getCompoundTag("triggerParameters[" + i + "][" + j + "]");
 					triggerParameters[i][j] = (ITriggerParameter) StatementManager.createParameter(cpt
@@ -209,7 +212,7 @@ public final class Gate implements IGate {
 				}
 			}
 
-			for (int j = 0; j < 3; ++j) {
+			for (int j = 0; j < MAX_PARAMETERS; ++j) {
 				if (data.hasKey("actionParameters[" + i + "][" + j + "]")) {
 					NBTTagCompound cpt = data.getCompoundTag("actionParameters[" + i + "][" + j + "]");
 					actionParameters[i][j] = (IActionParameter) StatementManager.createParameter(cpt.getString("kind"));
@@ -221,6 +224,7 @@ public final class Gate implements IGate {
 		for (PipeWire wire : PipeWire.VALUES) {
 			broadcastSignal.set(wire.ordinal(), data.getBoolean("wireState[" + wire.ordinal() + "]"));
 		}
+
 		redstoneOutput = data.getByte("redstoneOutput");
 	}
 
@@ -270,8 +274,8 @@ public final class Gate implements IGate {
 	}
 
 	public boolean isGateActive() {
-		for (ActionState state : actionsState) {
-			if (state == ActionState.Activated) {
+		for (ActionActiveState state : actionsState) {
+			if (state == ActionActiveState.Activated) {
 				return true;
 			}
 		}
@@ -297,6 +301,8 @@ public final class Gate implements IGate {
 		int oldRedstoneOutput = redstoneOutput;
 		redstoneOutput = 0;
 
+		boolean wasActive = activeActions.size() > 0;
+
 		BitSet temp = prevBroadcastSignal;
 		temp.clear();
 		prevBroadcastSignal = broadcastSignal;
@@ -307,7 +313,7 @@ public final class Gate implements IGate {
 
 		int [] actionGroups = new int [] {0, 1, 2, 3, 4, 5, 6, 7};
 
-		for (int i = 0; i < MAX_PARAMETERS; ++i) {
+		for (int i = 0; i < MAX_STATEMENTS; ++i) {
 			for (int j = i - 1; j >= 0; --j) {
 				if (actions[i] != null && actions[j] != null
 						&& actions[i].getUniqueTag().equals(actions[j].getUniqueTag())) {
@@ -333,78 +339,100 @@ public final class Gate implements IGate {
 
 		// Computes the actions depending on the triggers
 		for (int it = 0; it < MAX_STATEMENTS; ++it) {
-			actionsState[it] = ActionState.Deactivated;
+			actionsState[it] = ActionActiveState.Deactivated;
 
 			ITrigger trigger = triggers[it];
 			ITriggerParameter[] parameter = triggerParameters[it];
 
 			if (trigger != null) {
-				boolean active = isTriggerActive(trigger, parameter);
+				if (isTriggerActive(trigger, parameter)) {
+					actionsState[it] = ActionActiveState.Partial;
+				}
+			}
+		}
 
-				if (actionGroups[it] == it) {
-					if (active) {
-						actionsState[it] = ActionState.Activated;
-					}
-				} else {
-					if (active && actionsState[actionGroups[it]] != ActionState.Activated) {
-						actionsState[actionGroups[it]] = ActionState.Partial;
-					} else if (!active && actionsState[actionGroups[it]] == ActionState.Activated) {
-						actionsState[actionGroups[it]] = ActionState.Partial;
+		activeActions = new ArrayList<ActionSlot>();
+
+		for (int it = 0; it < MAX_STATEMENTS; ++it) {
+			boolean allActive = true;
+			boolean oneActive = false;
+
+			if (actions[it] == null) {
+				continue;
+			}
+
+			for (int j = 0; j < MAX_STATEMENTS; ++j) {
+				if (actionGroups[j] == it) {
+					if (actionsState[j] != ActionActiveState.Partial) {
+						allActive = false;
+					} else {
+						oneActive = true;
 					}
 				}
+			}
+
+			if ((logic == GateLogic.AND && allActive && oneActive) || (logic == GateLogic.OR && oneActive)) {
+				if (logic == GateLogic.AND) {
+					for (int j = 0; j < MAX_STATEMENTS; ++j) {
+						if (actionGroups[j] == it) {
+							actionsState[j] = ActionActiveState.Activated;
+						}
+					}
+				}
+
+				ActionSlot slot = new ActionSlot();
+				slot.action = actions[it];
+				slot.parameters = actionParameters[it];
+				activeActions.add(slot);
+			}
+
+			if (logic == GateLogic.OR && actionsState[it] == ActionActiveState.Partial) {
+				actionsState[it] = ActionActiveState.Activated;
 			}
 		}
 
 		// Activate the actions
-		for (int it = 0; it < MAX_STATEMENTS; ++it) {
-			if (actions[it] != null && actionGroups[it] == it && actionsState[it] == ActionState.Activated) {
-				IAction action = actions[it];
-				action.actionActivate(this, actionParameters[it]);
+		for (ActionSlot slot : activeActions) {
+			IAction action = slot.action;
+			action.actionActivate(this, slot.parameters);
 
-				// TODO: A lot of the code below should be removed in favor
-				// of calls to actionActivate
+			// TODO: A lot of the code below should be removed in favor
+			// of calls to actionActivate
 
-				// Custom gate actions take precedence over defaults.
-				if (resolveAction(action)) {
-					continue;
-				}
+			// Custom gate actions take precedence over defaults.
+			if (resolveAction(action)) {
+				continue;
+			}
 
-				if (action instanceof ActionRedstoneOutput) {
-					redstoneOutput = 15;
-				} else if (action instanceof ActionRedstoneFaderOutput) {
-					redstoneOutput = ((ActionRedstoneFaderOutput) action).level;
-				} else {
-					for (ForgeDirection side : ForgeDirection.VALID_DIRECTIONS) {
-						TileEntity tile = pipe.container.getTile(side);
-						if (tile instanceof IActionReceptor) {
-							IActionReceptor recept = (IActionReceptor) tile;
-							recept.actionActivated(action);
-						}
+			if (action instanceof ActionRedstoneOutput) {
+				redstoneOutput = 15;
+			} else if (action instanceof ActionRedstoneFaderOutput) {
+				redstoneOutput = ((ActionRedstoneFaderOutput) action).level;
+			} else {
+				for (ForgeDirection side : ForgeDirection.VALID_DIRECTIONS) {
+					TileEntity tile = pipe.container.getTile(side);
+					if (tile instanceof IActionReceptor) {
+						IActionReceptor recept = (IActionReceptor) tile;
+						recept.actionActivated(action);
 					}
 				}
-			}
-		}
-
-		LinkedList<IAction> activeActions = new LinkedList<IAction>();
-
-		for (int it = 0; it < MAX_STATEMENTS; ++it) {
-			if (actionGroups[it] == it && actionsState[it] == ActionState.Activated) {
-				activeActions.add(actions[it]);
 			}
 		}
 
 		pipe.actionsActivated(activeActions);
 
 		if (oldRedstoneOutput != redstoneOutput) {
-			if (redstoneOutput == 0 ^ oldRedstoneOutput == 0) {
-				pipe.container.scheduleRenderUpdate();
-			}
 			pipe.updateNeighbors(true);
 		}
 
 		if (!prevBroadcastSignal.equals(broadcastSignal)) {
-			pipe.container.scheduleRenderUpdate();
 			pipe.updateSignalState();
+		}
+
+		boolean isActive = activeActions.size() > 0;
+
+		if (wasActive != isActive) {
+			pipe.container.scheduleRenderUpdate();
 		}
 	}
 
@@ -463,6 +491,14 @@ public final class Gate implements IGate {
 		for (GateExpansionController expansion : expansions.values()) {
 			expansion.addActions(list);
 		}
+	}
+
+	public LinkedList<IAction> getActions() {
+		LinkedList<IAction> result = new LinkedList<IAction>();
+
+		addActions(result);
+
+		return result;
 	}
 
 	@Override

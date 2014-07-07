@@ -17,7 +17,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import buildcraft.api.core.IInvSlot;
-import buildcraft.api.gates.ITrigger;
 import buildcraft.api.gates.ITriggerParameter;
 import buildcraft.core.inventory.InventoryIterator;
 import buildcraft.core.inventory.StackHelper;
@@ -68,9 +67,13 @@ public class TriggerInventoryLevel extends BCTrigger {
 		if (tile instanceof IInventory) {
 			ItemStack searchStack = parameter.getItemStackToDraw();
 
+			if (searchStack == null) {
+				return false;
+			}
+
 			int stackSpace = 0;
 			int foundItems = 0;
-			for (IInvSlot slot : InventoryIterator.getIterable((IInventory) tile, side)) {
+			for (IInvSlot slot : InventoryIterator.getIterable((IInventory) tile, side.getOpposite())) {
 				if (slot.canPutStackInSlot(searchStack)) {
 					ItemStack stackInSlot = slot.getStackInSlot();
 					if (stackInSlot == null || StackHelper.canStacksMerge(stackInSlot, searchStack)) {
@@ -100,10 +103,5 @@ public class TriggerInventoryLevel extends BCTrigger {
 			default:
 				return StatementIconProvider.Trigger_Inventory_Below75;
 		}
-	}
-
-	@Override
-	public ITrigger rotateLeft() {
-		return this;
 	}
 }

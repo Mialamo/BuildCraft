@@ -174,8 +174,12 @@ public class TileGenericPipe extends TileEntity implements IPowerReceptor, IFlui
 					if (nbt.hasKey("facadeBlocks[" + i + "]")) {
 						// 5.0.x
 						Block block = (Block) Block.blockRegistry.getObjectById(nbt.getInteger("facadeBlocks[" + i + "]"));
-						int metadata = nbt.getInteger("facadeMeta[" + i + "]");
-						pluggable = new ItemFacade.FacadePluggable(new ItemFacade.FacadeState[]{ItemFacade.FacadeState.create(block, metadata)});
+						int blockId = nbt.getInteger("facadeBlocks[" + i + "]");
+
+						if (blockId != 0) {
+							int metadata = nbt.getInteger("facadeMeta[" + i + "]");
+							pluggable = new ItemFacade.FacadePluggable(new ItemFacade.FacadeState[]{ItemFacade.FacadeState.create(block, metadata)});
+						}
 					} else if (nbt.hasKey("facadeBlocksStr[" + i + "][0]")) {
 						// 6.0.x
 						ItemFacade.FacadeState mainState = ItemFacade.FacadeState.create(
@@ -232,6 +236,24 @@ public class TileGenericPipe extends TileEntity implements IPowerReceptor, IFlui
 			pluggables[direction.ordinal()] = null;
 			pipe.notifyBlockChanged();
 			return result;
+		}
+
+		public void invalidate() {
+			for (IPipePluggable p : pluggables) {
+				if (p != null) {
+					p.invalidate();
+				}
+			}
+		}
+
+		public void validate(TileGenericPipe pipe) {
+			for (ForgeDirection d : ForgeDirection.VALID_DIRECTIONS) {
+				IPipePluggable p = pluggables[d.ordinal()];
+
+				if (p != null) {
+					p.validate(pipe, d);
+				}
+			}
 		}
 	}
 
@@ -291,9 +313,13 @@ public class TileGenericPipe extends TileEntity implements IPowerReceptor, IFlui
 	public void invalidate() {
 		initialized = false;
 		tileBuffer = null;
+
 		if (pipe != null) {
 			pipe.invalidate();
 		}
+
+		sideProperties.invalidate();
+
 		super.invalidate();
 	}
 
@@ -303,9 +329,12 @@ public class TileGenericPipe extends TileEntity implements IPowerReceptor, IFlui
 		initialized = false;
 		tileBuffer = null;
 		bindPipe();
+
 		if (pipe != null) {
 			pipe.validate();
 		}
+
+		sideProperties.validate(this);
 	}
 
 	private void notifyBlockChanged() {
@@ -551,6 +580,10 @@ public class TileGenericPipe extends TileEntity implements IPowerReceptor, IFlui
 	/* IPIPEENTRY */
 	@Override
 	public int injectItem(ItemStack payload, boolean doAdd, ForgeDirection from) {
+		if (pipe.isClosed()) {
+			return 0;
+		}
+
 		if (BlockGenericPipe.isValid(pipe) && pipe.transport instanceof PipeTransportItems && isPipeConnected(from)) {
 			if (doAdd) {
 				Position itemPos = new Position(xCoord + 0.5, yCoord + 0.5, zCoord + 0.5, from.getOpposite());
@@ -561,6 +594,7 @@ public class TileGenericPipe extends TileEntity implements IPowerReceptor, IFlui
 			}
 			return payload.stackSize;
 		}
+
 		return 0;
 	}
 

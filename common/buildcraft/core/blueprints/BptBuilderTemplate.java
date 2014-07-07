@@ -111,9 +111,14 @@ public class BptBuilderTemplate extends BptBuilderBase {
 	}
 
 	@Override
+	public BuildingSlot reserveNextBlock(World world) {
+		return null;
+	}
+
+	@Override
 	public BuildingSlot getNextBlock(World world, TileAbstractBuilder inv) {
 		if (buildList.size() != 0) {
-			BuildingSlotBlock slot = internalGetNextBlock(world, inv, buildList);
+			BuildingSlotBlock slot = internalGetNextBlock(world, inv);
 			checkDone();
 
 			if (slot != null) {
@@ -126,7 +131,7 @@ public class BptBuilderTemplate extends BptBuilderBase {
 		return null;
 	}
 
-	public BuildingSlotBlock internalGetNextBlock(World world, TileAbstractBuilder builder, LinkedList<BuildingSlotBlock> list) {
+	public BuildingSlotBlock internalGetNextBlock(World world, TileAbstractBuilder builder) {
 		BuildingSlotBlock result = null;
 
 		IInvSlot firstSlotToConsume = null;
@@ -182,8 +187,7 @@ public class BptBuilderTemplate extends BptBuilderBase {
 					if (builder.energyAvailable() > SchematicRegistry.BUILD_ENERGY && firstSlotToConsume != null) {
 						builder.consumeEnergy(SchematicRegistry.BUILD_ENERGY);
 
-						slot.addStackConsumed(firstSlotToConsume
-								.decreaseStackInSlot());
+						slot.addStackConsumed(firstSlotToConsume.decreaseStackInSlot(1));
 						result = slot;
 						iterator.remove();
 						builtLocations.add(new BlockIndex(slot.x, slot.y, slot.z));

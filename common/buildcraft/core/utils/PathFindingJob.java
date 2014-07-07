@@ -8,20 +8,60 @@
  */
 package buildcraft.core.utils;
 
+import java.util.Date;
+
 public class PathFindingJob extends Thread {
 
 	private PathFinding pathFinding;
 
-	public PathFindingJob(PathFinding iPathFinding) {
+	private boolean stop = false;
+	private int maxIterations;
+
+	private boolean done = false;
+
+	public PathFindingJob(PathFinding iPathFinding, int iMaxIterations) {
 		super("Path Finding");
 		pathFinding = iPathFinding;
+		maxIterations = iMaxIterations;
+	}
+
+	public PathFindingJob(PathFinding iPathFinding) {
+		this(iPathFinding, 1000);
 	}
 
 	@Override
 	public void run() {
-		while (!pathFinding.isDone()) {
-			pathFinding.iterate();
+		try {
+			for (int i = 0; i < maxIterations; ++i) {
+				if (isTerminated() || pathFinding.isDone()) {
+					break;
+				}
+
+				long startTime = new Date().getTime();
+				long elapsedtime = 0;
+
+				pathFinding.iterate();
+
+				elapsedtime = new Date().getTime() - startTime;
+				sleep(elapsedtime);
+			}
+		} catch (Throwable t) {
+			t.printStackTrace();
+		} finally {
+			done = true;
 		}
+	}
+
+	public synchronized void terminate() {
+		stop = true;
+	}
+
+	public synchronized boolean isTerminated() {
+		return stop;
+	}
+
+	public synchronized boolean isDone() {
+		return done;
 	}
 
 }

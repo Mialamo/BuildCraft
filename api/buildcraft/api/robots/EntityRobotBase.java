@@ -8,12 +8,14 @@
  */
 package buildcraft.api.robots;
 
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 
 import buildcraft.api.boards.RedstoneBoardRobot;
+import buildcraft.api.core.IBox;
 
 public abstract class EntityRobotBase extends EntityLiving implements IInventory {
 
@@ -25,13 +27,13 @@ public abstract class EntityRobotBase extends EntityLiving implements IInventory
 
 	public abstract void setItemInUse(ItemStack stack);
 
-	public abstract ItemStack getItemInUse();
-
 	public abstract void setItemActive(boolean b);
 
 	public abstract boolean isMoving();
 
 	public abstract IDockingStation getLinkedStation();
+
+	public abstract IDockingStation getReservedStation();
 
 	public abstract RedstoneBoardRobot getBoard();
 
@@ -50,5 +52,13 @@ public abstract class EntityRobotBase extends EntityLiving implements IInventory
 	public abstract boolean reserveStation(IDockingStation station);
 
 	public abstract boolean linkToStation(IDockingStation station);
+
+	public abstract IBox getAreaToWork();
+
+	public abstract boolean containsItems();
+
+	public abstract void unreachableEntityDetected(Entity entity);
+
+	public abstract boolean isKnownUnreachable(Entity entity);
 
 }

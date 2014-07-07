@@ -14,7 +14,7 @@ import io.netty.buffer.Unpooled;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 
-public class PacketRPCEntity extends BuildCraftPacket {
+public class PacketRPCEntity extends PacketRPC {
 	private byte[] contents;
 	private Entity entity;
 	private int entityId;
@@ -28,10 +28,6 @@ public class PacketRPCEntity extends BuildCraftPacket {
 	}
 
 	@Override
-	public int getID() {
-		return PacketIds.RPC_ENTITY;
-	}
-
 	public void call(EntityPlayer sender) {
 		RPCMessageInfo info = new RPCMessageInfo();
 		info.sender = sender;
